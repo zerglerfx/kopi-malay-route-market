@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
 
         if (event.type === "checkout.session.completed") {
           const s = event.data.object as Stripe.Checkout.Session;
-          const orderId = s.metadata?.order_id;
+          const orderId = s.metadata?.["order_id"];
           if (orderId && s.payment_status === "paid") {
             const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
             const pi = typeof s.payment_intent === "string" ? s.payment_intent : s.payment_intent?.id ?? null;

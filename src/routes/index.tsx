@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
     ],
   }),
   component: Home,
-  errorComponent: ({ error }) => <p className="p-8 text-sale">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-8 text-sale">{error instanceof Error ? error.message : "Something went wrong"}</p>,
 });
 
 function Home() {

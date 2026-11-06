@@ -31,7 +31,7 @@ export const Route = createFileRoute("/product/$slug")({
   notFoundComponent: () => (
     <div className="p-16 text-center"><p className="mb-4">Product not found.</p><Link to="/shop" className="text-primary underline">Back to shop</Link></div>
   ),
-  errorComponent: ({ error }) => <p className="p-8 text-sale">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-8 text-sale">{error instanceof Error ? error.message : "Something went wrong"}</p>,
 });
 
 function ProductPage() {

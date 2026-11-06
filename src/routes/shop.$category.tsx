@@ -25,7 +25,7 @@ export const Route = createFileRoute("/shop/$category")({
     };
   },
   component: Page,
-  errorComponent: ({ error }) => <p className="p-8 text-sale">{error.message}</p>,
+  errorComponent: ({ error }) => <p className="p-8 text-sale">{error instanceof Error ? error.message : "Something went wrong"}</p>,
 });
 
 function Page() {

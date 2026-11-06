@@ -7,7 +7,7 @@ import { createCheckoutSession } from "@/lib/checkout.functions";
 import { formatRM, imageFor, MY_STATES, shippingFee } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
-  validateSearch: (s: Record<string, unknown>) => ({ cancelled: s.cancelled ? 1 : undefined }),
+  validateSearch: (s: Record<string, unknown>): { cancelled?: number | undefined } => (s["cancelled"] ? { cancelled: 1 } : {}),
   head: () => ({
     meta: [
       { title: "Checkout — Kopi Malay Route 1" },

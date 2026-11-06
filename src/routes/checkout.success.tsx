@@ -8,7 +8,7 @@ import { getOrderBySession } from "@/lib/checkout.functions";
 import { deliveryEstimate, formatRM } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/success")({
-  validateSearch: (s: Record<string, unknown>) => ({ session_id: typeof s.session_id === "string" ? s.session_id : "" }),
+  validateSearch: (s: Record<string, unknown>): { session_id?: string | undefined } => ({ session_id: typeof s["session_id"] === "string" ? s["session_id"] : "" }),
   head: () => ({
     meta: [
       { title: "Order confirmed — Kopi Malay Route 1" },
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/checkout/success")({
 });
 
 function Success() {
-  const { session_id } = Route.useSearch();
+  const session_id = Route.useSearch().session_id ?? "";
   const { clear } = useCart();
   const { data: order, isLoading } = useQuery({
     queryKey: ["order", session_id],
