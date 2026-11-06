@@ -26,19 +26,19 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     setBusy(true);
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
-      if (error) return toast.error(error.message);
+      if (error) { toast.error(error.message); return; }
       toast.success("Welcome back! Your cart has been synced.");
       navigate({ to: "/shop" });
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
       setBusy(false);
-      if (error) return toast.error(error.message);
+      if (error) { toast.error(error.message); return; }
       if (data.session) { toast.success("Account created!"); navigate({ to: "/shop" }); }
       else toast.success("Check your email to confirm your account.");
     }

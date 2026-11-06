@@ -4,7 +4,7 @@ import { categoriesQuery, productsQuery } from "@/lib/queries";
 import { effectivePrice } from "@/lib/shop";
 import { ProductCard } from "./product-card";
 
-export type ShopSearch = { q?: string; sort?: "featured" | "price-asc" | "price-desc" };
+export type ShopSearch = { q?: string | undefined; sort?: "featured" | "price-asc" | "price-desc" | undefined };
 
 export function validateShopSearch(s: Record<string, unknown>): ShopSearch {
   const sort = s.sort === "price-asc" || s.sort === "price-desc" ? s.sort : undefined;
