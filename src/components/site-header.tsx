@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/integrations/supabase/client";
+import badge from "@/assets/tak-route-1-badge.png.asset.json";
 
 export const NAV = [
   { label: "Shop All", category: undefined },
@@ -36,7 +37,7 @@ export function SiteHeader() {
           {menu ? <X className="size-6" /> : <Menu className="size-6" />}
         </button>
         <Link to="/" className="flex items-center gap-2">
-          <span className="grid size-9 place-items-center rounded-sm bg-signal font-display text-xs font-bold text-signal-foreground">R1</span>
+          <img src={badge.url} alt="Tak Route 1 badge" className="size-10 object-contain" />
           <span className="font-display text-lg font-bold leading-none">
             KOPI MALAY<span className="block text-[10px] font-medium tracking-[0.2em] text-ink-foreground/60">ROUTE 1 OFFICIAL</span>
           </span>
