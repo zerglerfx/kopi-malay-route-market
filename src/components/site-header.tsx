@@ -7,10 +7,12 @@ import badge from "@/assets/tak-route-1-badge.png.asset.json";
 
 export const NAV = [
   { label: "Shop All", category: undefined },
-  { label: "Shirts", category: "shirts" },
-  { label: "Sweaters & Jackets", category: "sweaters-jackets" },
+  { label: "Jerseys & T-shirts", category: "jerseys-t-shirts" },
   { label: "Stickers", category: "stickers" },
   { label: "Tumblers", category: "tumblers" },
+  { label: "Fridge Magnets", category: "fridge-magnets" },
+  { label: "Patches", category: "patches" },
+  { label: "Lanyard", category: "lanyard" },
   { label: "Other Merch", category: "other-merch" },
 ] as const;
 
@@ -33,7 +35,7 @@ export function SiteHeader() {
   return (
     <header className="no-print sticky top-0 z-40 bg-ink text-ink-foreground">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4">
-        <button className="lg:hidden" aria-label="Menu" onClick={() => setMenu(!menu)}>
+        <button className="xl:hidden" aria-label="Menu" onClick={() => setMenu(!menu)}>
           {menu ? <X className="size-6" /> : <Menu className="size-6" />}
         </button>
         <Link to="/" className="flex items-center gap-2">
@@ -42,7 +44,7 @@ export function SiteHeader() {
             KOPI MALAY<span className="block text-[10px] font-medium tracking-[0.2em] text-ink-foreground/60">ROUTE 1 OFFICIAL</span>
           </span>
         </Link>
-        <nav className="ml-6 hidden flex-1 items-center gap-6 lg:flex">
+        <nav className="ml-4 hidden min-w-0 flex-1 items-center gap-3 overflow-x-auto xl:flex [&>a]:shrink-0 [&>a]:text-xs">
           {NAV.map((n) => <NavLink key={n.label} item={n} />)}
         </nav>
         <div className="ml-auto flex items-center gap-4">
@@ -74,7 +76,7 @@ export function SiteHeader() {
         </form>
       )}
       {menu && (
-        <nav className="flex flex-col gap-4 border-t border-ink-foreground/10 px-4 py-4 lg:hidden">
+        <nav className="flex flex-col gap-4 border-t border-ink-foreground/10 px-4 py-4 xl:hidden">
           {NAV.map((n) => <NavLink key={n.label} item={n} onClick={() => setMenu(false)} />)}
         </nav>
       )}

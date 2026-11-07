@@ -3,11 +3,12 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Minus, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { PriceTag } from "@/components/product-card";
 import { useCart } from "@/hooks/use-cart";
 import { productQuery } from "@/lib/queries";
-import { imageFor, isApparel } from "@/lib/shop";
+import { imageFor, isApparel, shippingDescription } from "@/lib/shop";
 
 export const Route = createFileRoute("/product/$slug")({
   loader: async ({ context, params }) => {
@@ -58,7 +59,7 @@ function ProductPage() {
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 md:grid-cols-2 md:gap-12">
       <div>
         <div className="aspect-square overflow-hidden rounded-lg border bg-muted">
-          <img src={imageFor(gallery[img])} alt={p.name} width={1024} height={1024} className="size-full object-cover" />
+          <img src={imageFor(gallery[img])} alt={p.name} width={1024} height={1024} className="size-full object-contain" />
         </div>
         {gallery.length > 1 && (
           <div className="mt-3 flex gap-2">
@@ -78,8 +79,8 @@ function ProductPage() {
           <div className="mt-6">
             <p className="mb-2 font-display text-sm font-semibold uppercase">Size {size && <span className="text-muted-foreground">— {size}</span>}</p>
             <div className="flex flex-wrap gap-2">
-              {p.variants.sizes!.map((s) => (
-                <button key={s} onClick={() => setSize(s)} className={`min-w-12 rounded-md border px-3 py-2 font-medium ${size === s ? "border-ink bg-ink text-ink-foreground" : "bg-card hover:border-ink"}`}>{s}</button>
+              {(p.variants.sizes ?? []).map((s) => (
+                <Button variant="outline" key={s} onClick={() => setSize(s)} className={`min-w-12 px-3 font-medium ${size === s ? "border-ink bg-ink text-ink-foreground" : "bg-card hover:border-ink"}`}>{s}</Button>
               ))}
             </div>
           </div>
@@ -101,11 +102,11 @@ function ProductPage() {
           <AccordionItem value="desc"><AccordionTrigger className="font-display uppercase">Description</AccordionTrigger><AccordionContent>{p.description}</AccordionContent></AccordionItem>
           {apparel && (
             <AccordionItem value="size"><AccordionTrigger className="font-display uppercase">Size guide</AccordionTrigger>
-              <AccordionContent>Chest (cm): S 96 · M 102 · L 108 · XL 114 · XXL 120. Relaxed fit — size down for a closer fit.</AccordionContent>
+              <AccordionContent>Available sizes: {(p.variants.sizes ?? []).join(" · ")}. Measurements are not yet available.</AccordionContent>
             </AccordionItem>
           )}
           <AccordionItem value="ship"><AccordionTrigger className="font-display uppercase">Shipping</AccordionTrigger>
-            <AccordionContent>RM 8.00 to West Malaysia (3-5 business days). RM 15.00 to Sabah, Sarawak & Labuan (5-8 business days).</AccordionContent>
+            <AccordionContent>{shippingDescription(p.category_slug)}</AccordionContent>
           </AccordionItem>
         </Accordion>
       </div>

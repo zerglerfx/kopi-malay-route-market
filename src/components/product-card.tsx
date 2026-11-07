@@ -30,7 +30,7 @@ export function ProductCard({ p }: { p: Product }) {
   return (
     <div className="group flex flex-col overflow-hidden rounded-lg border bg-card">
       <Link to="/product/$slug" params={{ slug: p.slug }} className="relative block aspect-square overflow-hidden bg-muted">
-        <img src={imageFor(p.images[0])} alt={p.name} loading="lazy" width={1024} height={1024} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        <img src={imageFor(p.images[0])} alt={p.name} loading="lazy" width={1024} height={1024} className="size-full object-contain transition-transform duration-500 group-hover:scale-105" />
         {onSale && <span className="absolute left-2 top-2 rounded-sm bg-sale px-2 py-0.5 font-display text-xs font-bold uppercase text-sale-foreground">Sale</span>}
         {p.is_featured && !onSale && <span className="absolute left-2 top-2 rounded-sm bg-signal px-2 py-0.5 font-display text-xs font-bold uppercase text-signal-foreground">Best seller</span>}
       </Link>
