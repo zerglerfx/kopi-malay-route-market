@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import hero from "@/assets/hero.jpg";
+import hero from "@/assets/header.jpg.asset.json";
 import { ProductCard } from "@/components/product-card";
 import { categoriesQuery, productsQuery } from "@/lib/queries";
 import { imageFor } from "@/lib/shop";
@@ -33,7 +33,7 @@ function Home() {
   return (
     <>
       <section className="relative isolate overflow-hidden bg-ink text-ink-foreground">
-        <img src={hero} alt="Rider on a mountain road with a cup of kopi" width={1600} height={912} className="absolute inset-0 -z-10 size-full object-cover opacity-60" />
+        <img src={hero.url} alt="Kopi Malay storefront with the TAK ROUTE 1 shield sign at the 0 km checkpoint" width={2048} height={1536} className="absolute inset-0 -z-10 size-full object-cover opacity-60" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
         <div className="mx-auto flex min-h-[70vh] max-w-7xl flex-col justify-end px-4 pb-14 pt-32">
           <span className="w-fit rounded-sm bg-signal px-2 py-1 font-display text-xs font-bold uppercase text-signal-foreground">Official Route 1 Merch</span>
