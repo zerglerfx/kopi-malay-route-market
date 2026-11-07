@@ -21,7 +21,7 @@ const IMAGES: Record<string, string> = {
   "tumbler-16oz": tumbler16.url, "chromium-black-yellow": blackSticker.url,
   "chromium-red-white": redSticker.url, "kopi-malay-logo": logoSticker.url,
   "northern-full-loop": loopSticker.url, "pit-stop-south-asia": pitSticker.url,
-  "magnet-signage": signage.url, "magnet-south-asia": southMagnet.url, "magnet-tak-city": takMagnet.url,
+  "magnet-signage": signage.url, "magnet-south-asia": takMagnet.url, "magnet-tak-city": southMagnet.url,
   "jersey-front-back": jersey.url, "jersey-sleeves": jerseySleeves.url,
 };
 
