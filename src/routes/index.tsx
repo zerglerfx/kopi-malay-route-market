@@ -5,7 +5,7 @@ import { ProductCard } from "@/components/product-card";
 import { categoriesQuery, productsQuery } from "@/lib/queries";
 import { imageFor } from "@/lib/shop";
 
-const CAT_IMG: Record<string, string> = { shirts: "tee", "sweaters-jackets": "jacket", stickers: "sticker", tumblers: "tumbler", "other-merch": "cap" };
+const CAT_IMG: Record<string, string> = { "jerseys-t-shirts": "tee", stickers: "chromium-black-yellow", tumblers: "tumbler-16oz", "fridge-magnets": "magnet-tak-city", patches: "patch", lanyard: "cap", "other-merch": "cap" };
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
@@ -48,10 +48,10 @@ function Home() {
 
       <section className="mx-auto max-w-7xl px-4 py-12">
         <h2 className="font-display text-2xl font-bold uppercase">Shop by category</h2>
-        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
           {categories.map((c) => (
             <Link key={c.slug} to="/shop/$category" params={{ category: c.slug }} className="group relative aspect-[4/5] overflow-hidden rounded-lg border bg-muted">
-              <img src={imageFor(CAT_IMG[c.slug])} alt={c.name} loading="lazy" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <img src={imageFor(products.find((p) => p.category_slug === c.slug)?.images[0] ?? CAT_IMG[c.slug])} alt={c.name} loading="lazy" className="size-full object-contain transition-transform duration-500 group-hover:scale-105" />
               <span className="absolute inset-x-2 bottom-2 rounded-sm bg-ink px-2 py-1.5 text-center font-display text-sm font-semibold uppercase text-ink-foreground">{c.name}</span>
             </Link>
           ))}
@@ -70,7 +70,7 @@ function Home() {
 
       <section className="bg-primary text-primary-foreground">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-14 md:grid-cols-3">
-          {[["1,864", "Curves on the Mae Hong Son Loop"], ["RM 8", "Flat shipping in West Malaysia"], ["100%", "Made for riders & kopi lovers"]].map(([big, small]) => (
+          {[["1,864", "Curves on the Mae Hong Son Loop"], ["FREE", "Shipping across Thailand"], ["RM 20", "Malaysia quantity-block shipping"]].map(([big, small]) => (
             <div key={big}><p className="font-display text-5xl font-bold">{big}</p><p className="mt-1 text-primary-foreground/80">{small}</p></div>
           ))}
         </div>

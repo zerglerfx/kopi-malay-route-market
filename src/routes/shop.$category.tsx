@@ -3,7 +3,7 @@ import { ShopView, validateShopSearch } from "@/components/shop-view";
 import { categoriesQuery, productsQuery } from "@/lib/queries";
 
 const NAMES: Record<string, string> = {
-  shirts: "Shirts", "sweaters-jackets": "Sweaters & Jackets", stickers: "Stickers", tumblers: "Tumblers", "other-merch": "Other Merch",
+  "jerseys-t-shirts": "Jerseys & T-shirts", stickers: "Stickers", tumblers: "Tumblers", "fridge-magnets": "Fridge Magnets", patches: "Patches", lanyard: "Lanyard", "other-merch": "Other Merch",
 };
 
 export const Route = createFileRoute("/shop/$category")({

@@ -16,13 +16,18 @@ const CheckoutInput = z.object({
   phone: z.string().trim().min(6).max(30),
   address: z.string().trim().min(3).max(300),
   city: z.string().trim().min(1).max(100),
-  state: z.enum(MY_STATES),
+  country: z.enum(["Malaysia", "Thailand"]),
+  state: z.string().trim().min(1).max(100),
   postcode: z.string().regex(/^\d{5}$/),
   items: z.array(z.object({
     productId: z.string().uuid(),
     variant: z.string().max(20),
     quantity: z.number().int().min(1).max(50),
   })).min(1).max(50),
+}).superRefine((data, ctx) => {
+  if (data.country === "Malaysia" && !(MY_STATES as readonly string[]).includes(data.state)) {
+    ctx.addIssue({ code: "custom", path: ["state"], message: "Please choose a Malaysian state." });
+  }
 });
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
@@ -41,34 +46,38 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     }
 
     const ids = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,variants").in("id", ids);
+    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,variants,categories(slug)").eq("is_active", true).in("id", ids);
     if (error) throw new Error(error.message);
 
     const lines = data.items.map((i) => {
-      const p = products!.find((x) => x.id === i.productId);
+      const p = products?.find((x) => x.id === i.productId);
       if (!p) throw new Error("A product in your cart is no longer available.");
       const sizes = ((p.variants as { sizes?: string[] })?.sizes ?? []);
       if (sizes.length && !sizes.includes(i.variant)) throw new Error(`Please choose a size for ${p.name}.`);
-      const unit = effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
-      return { ...i, name: p.name, unit, variant: sizes.length ? i.variant : "" };
+      if (data.country === "Thailand" && p.price_thb == null) throw new Error(`Thailand pricing is not available yet for ${p.name}.`);
+      const unit = data.country === "Thailand" ? Number(p.price_thb) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
+      return { ...i, name: p.name, unit, category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "" };
     });
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
-    const ship = shippingFee(data.state);
+    const ship = shippingFee(data.country, lines);
+    const currency = data.country === "Thailand" ? "thb" : "myr";
     const orderNumber = `KM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     const { data: order, error: oErr } = await supabaseAdmin.from("orders").insert({
       order_number: orderNumber,
       user_id: userId,
       guest_email: data.email,
-      shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode },
+      currency,
+      shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
       subtotal, shipping_fee: ship, total_amount: subtotal + ship,
     }).select("id").single();
     if (oErr) throw new Error(oErr.message);
 
-    await supabaseAdmin.from("order_items").insert(lines.map((l) => ({
+    const { error: itemsError } = await supabaseAdmin.from("order_items").insert(lines.map((l) => ({
       order_id: order.id, product_id: l.productId, product_name: l.name, selected_variant: l.variant, unit_price: l.unit, quantity: l.quantity,
     })));
+    if (itemsError) throw new Error("Could not save your order items. Please try again.");
 
     const session = await stripe().checkout.sessions.create({
       mode: "payment",
@@ -76,7 +85,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       line_items: lines.map((l) => ({
         quantity: l.quantity,
         price_data: {
-          currency: "myr",
+          currency,
           unit_amount: Math.round(l.unit * 100),
           product_data: { name: l.variant ? `${l.name} (${l.variant})` : l.name },
         },
@@ -84,8 +93,8 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       shipping_options: [{
         shipping_rate_data: {
           type: "fixed_amount",
-          display_name: ship === 15 ? "East Malaysia flat rate" : "West Malaysia flat rate",
-          fixed_amount: { amount: Math.round(ship * 100), currency: "myr" },
+          display_name: data.country === "Thailand" ? "Free Thailand shipping" : "Malaysia quantity-based shipping",
+          fixed_amount: { amount: Math.round(ship * 100), currency },
         },
       }],
       metadata: { order_id: order.id },
@@ -98,9 +107,10 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
   });
 
 export type OrderSummary = {
+  currency: string;
   order_number: string; status: string; created_at: string; transaction_id: string | null;
   subtotal: number; shipping_fee: number; total_amount: number; email: string | null;
-  shipping_address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string };
+  shipping_address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string; country?: string };
   items: { product_name: string; selected_variant: string; unit_price: number; quantity: number }[];
 };
 
@@ -124,6 +134,7 @@ export const getOrderBySession = createServerFn({ method: "GET" })
       }
     }
     return {
+      currency: order.currency,
       order_number: order.order_number, status, created_at: order.created_at, transaction_id: pi,
       subtotal: Number(order.subtotal), shipping_fee: Number(order.shipping_fee), total_amount: Number(order.total_amount),
       email: order.guest_email, shipping_address: order.shipping_address as OrderSummary["shipping_address"],

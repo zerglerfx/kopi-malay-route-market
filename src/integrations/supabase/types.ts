@@ -121,6 +121,7 @@ export type Database = {
       orders: {
         Row: {
           created_at: string
+          currency: string
           guest_email: string | null
           id: string
           order_number: string
@@ -136,6 +137,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          currency?: string
           guest_email?: string | null
           id?: string
           order_number: string
@@ -151,6 +153,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          currency?: string
           guest_email?: string | null
           id?: string
           order_number?: string
@@ -173,9 +176,11 @@ export type Database = {
           description: string
           id: string
           images: string[]
+          is_active: boolean
           is_featured: boolean
           name: string
           price: number
+          price_thb: number | null
           sale_price: number | null
           slug: string
           stock_qty: number
@@ -187,9 +192,11 @@ export type Database = {
           description?: string
           id?: string
           images?: string[]
+          is_active?: boolean
           is_featured?: boolean
           name: string
           price: number
+          price_thb?: number | null
           sale_price?: number | null
           slug: string
           stock_qty?: number
@@ -201,9 +208,11 @@ export type Database = {
           description?: string
           id?: string
           images?: string[]
+          is_active?: boolean
           is_featured?: boolean
           name?: string
           price?: number
+          price_thb?: number | null
           sale_price?: number | null
           slug?: string
           stock_qty?: number

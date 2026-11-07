@@ -3,10 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useCart } from "@/hooks/use-cart";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { productsQuery } from "@/lib/queries";
+import { Button } from "@/components/ui/button";
 import { createCheckoutSession } from "@/lib/checkout.functions";
-import { formatRM, imageFor, MY_STATES, shippingFee } from "@/lib/shop";
+import { destinationPrice, formatMoney, imageFor, MY_STATES, shippingFee, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
   validateSearch: (s: Record<string, unknown>): { cancelled?: number | undefined } => (s["cancelled"] ? { cancelled: 1 } : {}),
   head: () => ({
     meta: [
@@ -25,24 +29,35 @@ export const Route = createFileRoute("/checkout/")({
 const field = "w-full rounded-md border bg-card px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-ring";
 
 function Checkout() {
-  const { items, subtotal, user } = useCart();
+  const { items, user } = useCart();
+  const { data: products } = useSuspenseQuery(productsQuery);
   const { cancelled } = Route.useSearch();
   const create = useServerFn(createCheckoutSession);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({ email: "", name: "", phone: "", address: "", city: "", state: "", postcode: "" });
-  const ship = shippingFee(f.state);
+  const [country, setCountry] = useState<Country>("Malaysia");
+  const currency = country === "Thailand" ? "thb" : "myr";
+  const money = (value: number) => formatMoney(value, currency);
+  const lines = items.map((item) => {
+    const product = products.find((p) => p.id === item.productId);
+    return { ...item, product, price: product ? destinationPrice(product, country) : null };
+  });
+  const unavailable = lines.some((line) => line.price == null);
+  const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
+  const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch" })));
 
   useEffect(() => { if (cancelled) toast.warning("Payment was cancelled — your cart is still saved."); }, [cancelled]);
-  useEffect(() => { if (user?.email) setF((p) => (p.email ? p : { ...p, email: user.email! })); }, [user]);
+  useEffect(() => { const email = user?.email; if (email) setF((p) => (p.email ? p : { ...p, email })); }, [user]);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (unavailable) { toast.warning("Some items are unavailable for this destination."); return; }
     if (!f.state) { toast.warning("Please choose your state"); return; }
     setBusy(true);
     try {
-      const res = await create({ data: { ...f, state: f.state as (typeof MY_STATES)[number], items: items.map((i) => ({ productId: i.productId, variant: i.variant, quantity: i.quantity })) } });
+      const res = await create({ data: { ...f, country, items: items.map((i) => ({ productId: i.productId, variant: i.variant, quantity: i.quantity })) } });
       if (res.url) window.location.href = res.url;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not start payment");
@@ -72,14 +87,17 @@ function Checkout() {
           </section>
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold uppercase">Shipping address</h2>
+            <select aria-label="Country" value={country} onChange={(e) => { setCountry(e.target.value === "Thailand" ? "Thailand" : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }} className={field}>
+              <option>Malaysia</option><option>Thailand</option>
+            </select>
             <input required placeholder="Full name" value={f.name} onChange={set("name")} className={field} />
             <input required placeholder="Address" value={f.address} onChange={set("address")} className={field} />
             <div className="grid gap-3 sm:grid-cols-3">
               <input required placeholder="City" value={f.city} onChange={set("city")} className={field} />
-              <select required value={f.state} onChange={set("state")} className={field} aria-label="State">
+              {country === "Malaysia" ? <select required value={f.state} onChange={set("state")} className={field} aria-label="State">
                 <option value="">State</option>
                 {MY_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </select> : <input required aria-label="Province" placeholder="Province" value={f.state} onChange={set("state")} className={field} />}
               <input required placeholder="Postcode" pattern="\d{5}" inputMode="numeric" value={f.postcode} onChange={set("postcode")} className={field} />
             </div>
           </section>
@@ -87,23 +105,24 @@ function Checkout() {
         <aside className="h-fit rounded-lg border bg-card p-5">
           <h2 className="font-display text-lg font-semibold uppercase">Order summary</h2>
           <ul className="mt-4 space-y-3">
-            {items.map((i) => (
+            {lines.map((i) => (
               <li key={i.productId + i.variant} className="flex gap-3 text-sm">
-                <img src={imageFor(i.image)} alt="" className="size-14 rounded border object-cover" />
+                <img src={imageFor(i.product?.images[0] ?? i.image)} alt="" className="size-14 rounded border object-contain" />
                 <div className="flex-1"><p className="font-medium">{i.name}</p><p className="text-muted-foreground">{i.variant && `${i.variant} · `}Qty {i.quantity}</p></div>
-                <span>{formatRM(i.unitPrice * i.quantity)}</span>
+                <span>{i.price == null ? "Unavailable" : money(i.price * i.quantity)}</span>
               </li>
             ))}
           </ul>
           <dl className="mt-4 space-y-1 border-t pt-4 text-sm">
-            <div className="flex justify-between"><dt>Subtotal</dt><dd>{formatRM(subtotal)}</dd></div>
-            <div className="flex justify-between"><dt>Shipping</dt><dd>{f.state ? formatRM(ship) : "Select state"}</dd></div>
-            <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{formatRM(subtotal + ship)}</dd></div>
+            <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
+            <div className="flex justify-between"><dt>Shipping</dt><dd>{ship === 0 ? "Free" : money(ship)}</dd></div>
+            <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable ? "—" : money(subtotal + ship)}</dd></div>
           </dl>
-          <button disabled={busy} className="mt-5 w-full rounded-md bg-primary py-3 font-display font-semibold uppercase text-primary-foreground hover:opacity-90 disabled:opacity-50">
+          {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
+          <Button type="submit" disabled={busy || unavailable} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Redirecting…" : "Pay with Stripe"}
-          </button>
-          <p className="mt-2 text-center text-xs text-muted-foreground">West Malaysia RM 8.00 · Sabah/Sarawak/Labuan RM 15.00</p>
+          </Button>
+          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: free. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 10 accessories. Each group is charged separately.</p>
         </aside>
       </form>
     </div>

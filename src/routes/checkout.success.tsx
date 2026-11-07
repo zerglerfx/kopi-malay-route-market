@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { CheckCircle2, Printer } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { getOrderBySession } from "@/lib/checkout.functions";
-import { deliveryEstimate, formatRM } from "@/lib/shop";
+import { deliveryEstimate, formatMoney } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/success")({
   validateSearch: (s: Record<string, unknown>): { session_id?: string | undefined } => ({ session_id: typeof s["session_id"] === "string" ? s["session_id"] : "" }),
@@ -42,6 +42,7 @@ function Success() {
   );
 
   const a = order.shipping_address;
+  const money = (value: number) => formatMoney(value, order.currency);
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="text-center">
@@ -54,21 +55,21 @@ function Success() {
           <div><p className="text-muted-foreground">Order number</p><p className="font-display font-semibold">{order.order_number}</p></div>
           <div><p className="text-muted-foreground">Transaction ID</p><p className="break-all font-mono text-xs">{order.transaction_id ?? "Pending"}</p></div>
           <div><p className="text-muted-foreground">Date</p><p>{new Date(order.created_at).toLocaleString("en-MY")}</p></div>
-          <div><p className="text-muted-foreground">Estimated delivery</p><p>{deliveryEstimate(a.state ?? "")}</p></div>
-          <div className="sm:col-span-2"><p className="text-muted-foreground">Ship to</p><p>{a.name}, {a.address}, {a.postcode} {a.city}, {a.state} · {a.phone}</p></div>
+          {a.country !== "Thailand" && <div><p className="text-muted-foreground">Estimated delivery</p><p>{deliveryEstimate(a.state ?? "")}</p></div>}
+          <div className="sm:col-span-2"><p className="text-muted-foreground">Ship to</p><p>{a.name}, {a.address}, {a.postcode} {a.city}, {a.state}, {a.country ?? "Malaysia"} · {a.phone}</p></div>
         </div>
         <table className="mt-6 w-full text-sm">
           <thead><tr className="border-b text-left text-muted-foreground"><th className="py-2">Item</th><th>Qty</th><th className="text-right">Total</th></tr></thead>
           <tbody>
             {order.items.map((i, idx) => (
-              <tr key={idx} className="border-b"><td className="py-2">{i.product_name}{i.selected_variant && ` (${i.selected_variant})`}</td><td>{i.quantity}</td><td className="text-right">{formatRM(i.unit_price * i.quantity)}</td></tr>
+              <tr key={idx} className="border-b"><td className="py-2">{i.product_name}{i.selected_variant && ` (${i.selected_variant})`}</td><td>{i.quantity}</td><td className="text-right">{money(i.unit_price * i.quantity)}</td></tr>
             ))}
           </tbody>
         </table>
         <dl className="mt-4 space-y-1 text-sm">
-          <div className="flex justify-between"><dt>Subtotal</dt><dd>{formatRM(order.subtotal)}</dd></div>
-          <div className="flex justify-between"><dt>Shipping</dt><dd>{formatRM(order.shipping_fee)}</dd></div>
-          <div className="flex justify-between font-display text-lg font-bold"><dt>Total paid</dt><dd>{formatRM(order.total_amount)}</dd></div>
+          <div className="flex justify-between"><dt>Subtotal</dt><dd>{money(order.subtotal)}</dd></div>
+          <div className="flex justify-between"><dt>Shipping</dt><dd>{money(order.shipping_fee)}</dd></div>
+          <div className="flex justify-between font-display text-lg font-bold"><dt>Total paid</dt><dd>{money(order.total_amount)}</dd></div>
         </dl>
       </div>
       <div className="no-print mt-6 flex justify-center gap-3">
