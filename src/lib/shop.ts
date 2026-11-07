@@ -4,9 +4,25 @@ import hoodie from "@/assets/p-hoodie.jpg";
 import sticker from "@/assets/p-sticker.jpg";
 import tumbler from "@/assets/p-tumbler.jpg";
 import cap from "@/assets/p-cap.jpg";
+import tumbler16 from "@/assets/catalog/tumbler-16oz.jpg.asset.json";
+import blackSticker from "@/assets/catalog/chromium-black-yellow.jpg.asset.json";
+import redSticker from "@/assets/catalog/chromium-red-white.jpg.asset.json";
+import logoSticker from "@/assets/catalog/kopi-malay-logo.jpg.asset.json";
+import loopSticker from "@/assets/catalog/northern-full-loop.jpg.asset.json";
+import pitSticker from "@/assets/catalog/pit-stop-south-asia.jpg.asset.json";
+import signage from "@/assets/catalog/magnet-signage.jpg.asset.json";
+import southMagnet from "@/assets/catalog/magnet-south-asia.png.asset.json";
+import takMagnet from "@/assets/catalog/magnet-tak-city.png.asset.json";
+import jersey from "@/assets/catalog/jersey-front-back.png.asset.json";
+import jerseySleeves from "@/assets/catalog/jersey-sleeves.png.asset.json";
 
 const IMAGES: Record<string, string> = {
   tee, "tee-back": tee, jacket, hoodie, sticker, tumbler, mug: tumbler, cap, patch: cap,
+  "tumbler-16oz": tumbler16.url, "chromium-black-yellow": blackSticker.url,
+  "chromium-red-white": redSticker.url, "kopi-malay-logo": logoSticker.url,
+  "northern-full-loop": loopSticker.url, "pit-stop-south-asia": pitSticker.url,
+  "magnet-signage": signage.url, "magnet-south-asia": southMagnet.url, "magnet-tak-city": takMagnet.url,
+  "jersey-front-back": jersey.url, "jersey-sleeves": jerseySleeves.url,
 };
 
 export function imageFor(key: string | undefined): string {
@@ -26,6 +42,7 @@ export type Product = {
   description: string;
   price: number;
   sale_price: number | null;
+  price_thb: number | null;
   images: string[];
   variants: { sizes?: string[] };
   is_featured: boolean;
@@ -55,9 +72,28 @@ export function isEastMalaysia(state: string): boolean {
   return EAST.has(state);
 }
 
-export function shippingFee(state: string): number {
-  if (!state) return 0;
-  return isEastMalaysia(state) ? 15 : 8;
+export type Country = "Malaysia" | "Thailand";
+export const APPAREL_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
+export type ShippingLine = { category_slug: string; quantity: number };
+export function shippingFee(country: Country, lines: ShippingLine[]): number {
+  if (country === "Thailand") return 0;
+  let tumblers = 0, apparel = 0, accessories = 0;
+  for (const line of lines) {
+    if (line.category_slug === "tumblers") tumblers += line.quantity;
+    else if (["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(line.category_slug)) apparel += line.quantity;
+    else accessories += line.quantity;
+  }
+  return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 10));
+}
+export function destinationPrice(p: Product, country: Country): number | null {
+  return country === "Thailand" ? p.price_thb : effectivePrice(p);
+}
+export function formatMoney(value: number, currency: string): string {
+  return `${currency.toLowerCase() === "thb" ? "THB" : "RM"} ${value.toFixed(2)}`;
+}
+export function shippingDescription(category: string): string {
+  const block = category === "tumblers" ? "2 tumblers" : ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category) ? "2 apparel items" : "10 accessories";
+  return `Free shipping to Thailand. Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately.`;
 }
 
 export function deliveryEstimate(state: string): string {
