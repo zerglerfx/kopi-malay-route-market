@@ -11,4 +11,6 @@
 
 - Store data reads go through public server functions in `src/lib/shop.functions.ts`; checkout re-prices from the database server-side so client prices are never trusted.
 - Stripe payment confirmation happens in `/api/public/stripe-webhook` (signature-verified), with the success page re-checking the Stripe session as a fallback.
-- Product images are bundled assets referenced by key in `products.images` (mapped in `src/lib/shop.ts`); full URLs are also accepted.
+- Product images use keys mapped in `src/lib/shop.ts` to bundled assets or CDN pointer imports; full URLs are also accepted, so uploaded media remains out of the repository.
+- Destination pricing and shipping share browser-safe helpers: checkout rehydrates cart products from the catalog and the server independently computes the same totals; orders persist currency to keep historical receipts accurate.
+- Retire replaced catalog placeholders with `is_active=false`, excluding them from reads and checkout while retaining historical order references.
