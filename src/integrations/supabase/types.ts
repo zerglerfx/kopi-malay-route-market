@@ -120,12 +120,14 @@ export type Database = {
       }
       orders: {
         Row: {
+          access_token: string | null
           created_at: string
           currency: string
           guest_email: string | null
           id: string
           order_number: string
           payment_method: string
+          receipt_path: string | null
           shipping_address: Json
           shipping_fee: number
           status: string
@@ -136,12 +138,14 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          access_token?: string | null
           created_at?: string
           currency?: string
           guest_email?: string | null
           id?: string
           order_number: string
           payment_method?: string
+          receipt_path?: string | null
           shipping_address?: Json
           shipping_fee: number
           status?: string
@@ -152,12 +156,14 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          access_token?: string | null
           created_at?: string
           currency?: string
           guest_email?: string | null
           id?: string
           order_number?: string
           payment_method?: string
+          receipt_path?: string | null
           shipping_address?: Json
           shipping_fee?: number
           status?: string
