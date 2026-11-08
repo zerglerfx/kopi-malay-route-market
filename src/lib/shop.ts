@@ -15,6 +15,12 @@ import southMagnet from "@/assets/catalog/magnet-south-asia.png.asset.json";
 import takMagnet from "@/assets/catalog/magnet-tak-city.png.asset.json";
 import jersey from "@/assets/catalog/jersey-front-back.png.asset.json";
 import jerseySleeves from "@/assets/catalog/jersey-sleeves.png.asset.json";
+import stickerBanMaekonken from "@/assets/catalog/sticker-ban-maekonken-curve-33.jpg.asset.json";
+import stickerBlackYellow from "@/assets/catalog/sticker-black-yellow-tak-route-1.jpg.asset.json";
+import stickerRedWhite from "@/assets/catalog/sticker-red-white-tak-route-1.jpg.asset.json";
+import stickerSignageA from "@/assets/catalog/sticker-signage-a.jpg.asset.json";
+import stickerSignageB from "@/assets/catalog/sticker-signage-b.jpg.asset.json";
+import stickerUmphang from "@/assets/catalog/sticker-umphang-1219-curves.jpg.asset.json";
 
 const IMAGES: Record<string, string> = {
   tee, "tee-back": tee, jacket, hoodie, sticker, tumbler, mug: tumbler, cap, patch: cap,
@@ -23,6 +29,12 @@ const IMAGES: Record<string, string> = {
   "northern-full-loop": loopSticker.url, "pit-stop-south-asia": pitSticker.url,
   "magnet-signage": signage.url, "magnet-south-asia": takMagnet.url, "magnet-tak-city": southMagnet.url,
   "jersey-front-back": jersey.url, "jersey-sleeves": jerseySleeves.url,
+  "sticker-ban-maekonken-curve-33": stickerBanMaekonken.url,
+  "sticker-black-yellow-tak-route-1": stickerBlackYellow.url,
+  "sticker-red-white-tak-route-1": stickerRedWhite.url,
+  "sticker-signage-a": stickerSignageA.url,
+  "sticker-signage-b": stickerSignageB.url,
+  "sticker-umphang-1219-curves": stickerUmphang.url,
 };
 
 export function imageFor(key: string | undefined): string {
