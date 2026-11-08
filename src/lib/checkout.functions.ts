@@ -13,6 +13,7 @@ const CheckoutInput = z.object({
   country: z.enum(["Malaysia", "Thailand"]),
   state: z.string().trim().min(1).max(100),
   postcode: z.string().regex(/^\d{5}$/),
+  ref: z.string().regex(ORDER_REF_RE).optional(),
   items: z.array(z.object({
     productId: z.string().uuid(),
     variant: z.string().max(20),
@@ -102,7 +103,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
 
     let order: { id: string; order_number: string } | null = null;
     for (let attempt = 0; attempt < 5 && !order; attempt++) {
-      const ref = makeOrderRef();
+      const ref = attempt === 0 && data.ref && ORDER_REF_RE.test(data.ref) ? data.ref : makeOrderRef();
       const { data: o, error: oErr } = await supabaseAdmin.from("orders").insert({
         order_number: ref, user_id: userId, guest_email: data.email, currency,
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
