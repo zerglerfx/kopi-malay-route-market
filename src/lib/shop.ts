@@ -86,7 +86,7 @@ export function isEastMalaysia(state: string): boolean {
 }
 
 export type Country = "Malaysia" | "Thailand" | "Singapore";
-export const APPAREL_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
+export const APPAREL_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
 export type ShippingLine = { category_slug: string; quantity: number; weight_kg?: number | null };
 export function eastMalaysiaSurcharge(country: Country, state: string): number {
   return country === "Malaysia" && ["Sabah", "Sarawak"].includes(state) ? 10 : 0;
