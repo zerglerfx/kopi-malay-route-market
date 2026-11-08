@@ -41,7 +41,7 @@ export function SiteHeader() {
         </button>
         <Link to="/" className="flex min-w-0 items-center gap-1.5 sm:gap-2" aria-label="Kopi Malay x Route 1 home">
           <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-8 shrink-0 rounded-full bg-background object-contain p-0.5 sm:size-10" />
-          <span className="min-w-0 font-display text-sm font-bold leading-tight sm:text-lg sm:leading-none">
+          <span className="min-w-0 whitespace-nowrap font-display text-[13px] font-bold leading-tight sm:text-lg sm:leading-none">
             <span className="block sm:inline">KOPI MALAY</span>
             <span className="text-signal"> x </span>ROUTE 1
           </span>
