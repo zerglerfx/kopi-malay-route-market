@@ -12,6 +12,12 @@ describe("uploaded catalog prices", () => {
     ["patch-velcro-pit-stop-south-asia-gate", 14.5, 109],
     ["patch-velcro-red-white-tak-route-1", 14.5, 109],
     ["sticker-route-1-emblem", 6.5, 49],
+    ["sticker-ban-maekonken-curve-33", 6.5, 49],
+    ["sticker-black-yellow-tak-route-1", 6.5, 49],
+    ["sticker-red-white-tak-route-1", 6.5, 49],
+    ["sticker-signage-a", 6.5, 49],
+    ["sticker-signage-b", 6.5, 49],
+    ["sticker-umphang-1219-curves", 6.5, 49],
   ])("%s has the specified MYR and THB prices", async (slug, rm, thb) => {
     const response = await fetch(`http://localhost:8080/product/${slug}`);
     expect(response.ok).toBe(true);
