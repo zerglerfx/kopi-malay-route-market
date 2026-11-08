@@ -6,7 +6,10 @@ import { useCart } from "@/hooks/use-cart";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { productsQuery } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
-import { createCheckoutSession } from "@/lib/checkout.functions";
+import { submitManualOrder } from "@/lib/checkout.functions";
+import { makeOrderRef, receiptError } from "@/lib/manual-order";
+import { useNavigate } from "@tanstack/react-router";
+import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import { destinationPrice, eastMalaysiaSurcharge, formatMoney, imageFor, MY_STATES, shippingFee, SINGAPORE_NOTICE, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
@@ -32,8 +35,13 @@ function Checkout() {
   const { items, user } = useCart();
   const { data: products } = useSuspenseQuery(productsQuery);
   const { cancelled } = Route.useSearch();
-  const create = useServerFn(createCheckoutSession);
+  const create = useServerFn(submitManualOrder);
+  const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [ref, setRef] = useState("");
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [receiptMsg, setReceiptMsg] = useState<string | null>(null);
+  useEffect(() => { setRef(makeOrderRef()); }, []);
   const [f, setF] = useState({ email: "", name: "", phone: "", address: "", city: "", state: "", postcode: "" });
   const [country, setCountry] = useState<Country>("Malaysia");
   const currency = country === "Thailand" ? "thb" : "myr";
@@ -58,12 +66,17 @@ function Checkout() {
     if (unavailable) { toast.warning("Some items are unavailable for this destination."); return; }
     if (ship == null) { toast.warning("Please contact Kopi Malay for a Thailand tumbler shipping quote."); return; }
     if (!f.state) { toast.warning("Please choose your state"); return; }
+    const rErr = receiptError(receipt);
+    if (rErr || !receipt) { setReceiptMsg(rErr); toast.warning(rErr ?? "Please upload your payment proof."); return; }
     setBusy(true);
     try {
-      const res = await create({ data: { ...f, country, items: items.map((i) => ({ productId: i.productId, variant: i.variant, quantity: i.quantity })) } });
-      if (res.url) window.location.href = res.url;
+      const fd = new FormData();
+      fd.append("payload", JSON.stringify({ ...f, country, ref, items: items.map((i) => ({ productId: i.productId, variant: i.variant, quantity: i.quantity })) }));
+      fd.append("receipt", receipt);
+      const res = await create({ data: fd });
+      await navigate({ to: "/order-success", search: { ref: res.ref, t: res.token } });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not start payment");
+      toast.error(err instanceof Error ? err.message : "Could not submit your order");
       setBusy(false);
     }
   };
@@ -106,6 +119,34 @@ function Checkout() {
               <input required placeholder="Postcode" pattern="\d{5}" inputMode="numeric" value={f.postcode} onChange={set("postcode")} className={field} />
             </div>
           </section>
+          {country !== "Singapore" && (
+            <section className="space-y-4 rounded-lg border bg-card p-5">
+              <h2 className="font-display text-lg font-semibold uppercase">Pay with DuitNow / Touch 'n Go QR</h2>
+              <div className="grid gap-5 sm:grid-cols-[220px_1fr]">
+                <img src={qrAsset.url} alt="Kopi Malay DuitNow / Touch 'n Go payment QR code" className="mx-auto w-full max-w-[220px] rounded-md border bg-background" />
+                <div className="space-y-3 text-sm">
+                  <div className="rounded-md border bg-background p-3">
+                    <p className="text-muted-foreground">Amount to pay</p>
+                    <p className="font-display text-2xl font-bold">{unavailable || ship == null ? "—" : money(subtotal + ship)}</p>
+                    <p className="mt-2 text-muted-foreground">Payment reference (put this in your transfer note)</p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-display text-xl font-bold">{ref || "…"}</span>
+                      <button type="button" onClick={() => { void navigator.clipboard?.writeText(ref); toast.success("Reference copied"); }} className="rounded border px-2 py-1 text-xs">Copy</button>
+                    </div>
+                  </div>
+                  <p><strong>Malaysia:</strong> Scan with Touch 'n Go eWallet or any Malaysian mobile banking app (DuitNow QR).</p>
+                  <p><strong>Thailand / ประเทศไทย:</strong> Scan with any major Thai bank app (SCB, K-Bank, Krungthai) via cross-border PromptPay / DuitNow QR. สแกนผ่านแอปธนาคารไทย (PromptPay ข้ามประเทศ)</p>
+                </div>
+              </div>
+              <label className="block space-y-1.5">
+                <span className="font-medium">Upload payment proof / receipt *</span>
+                <input required type="file" accept="image/png,image/jpeg,application/pdf" onChange={(e) => { const file = e.target.files?.[0] ?? null; setReceipt(file); setReceiptMsg(file ? receiptError(file) : null); }} className={field} />
+                <span className="block text-xs text-muted-foreground">PNG, JPG or PDF, up to 5MB.</span>
+                {receipt && !receiptMsg && <span className="block text-xs">Selected: {receipt.name}</span>}
+                {receiptMsg && <span role="alert" className="block text-sm text-sale">{receiptMsg}</span>}
+              </label>
+            </section>
+          )}
         </div>
         <aside className="h-fit rounded-lg border bg-card p-5">
           <h2 className="font-display text-lg font-semibold uppercase">Order summary</h2>
@@ -126,8 +167,8 @@ function Checkout() {
           </dl>
           {unavailable && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
           {ship == null && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
-          <Button type="submit" disabled={busy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
-            {busy ? "Redirecting…" : "Pay with Stripe"}
+          <Button type="submit" disabled={busy || unavailable || ship == null || country === "Singapore"} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
+            {busy ? "Submitting…" : "Confirm Order & Submit Receipt"}
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
         </aside>
