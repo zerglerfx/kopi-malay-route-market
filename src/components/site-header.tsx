@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/integrations/supabase/client";
-import badge from "@/assets/tak-route-1-shield.jpeg.asset.json";
+import badge from "@/assets/tak-route-1-shield-transparent.png.asset.json";
 import kopiLogo from "@/assets/kopi-malay-official-logo.png.asset.json";
 
 export const NAV = [
@@ -41,10 +41,10 @@ export function SiteHeader() {
         </button>
         <Link to="/" className="flex items-center gap-2">
           <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-10 rounded-full bg-background object-contain p-0.5" />
-          <img src={badge.url} alt="Tak Route 1 badge" className="size-10 object-contain" />
           <span className="font-display text-lg font-bold leading-none">
             KOPI MALAY<span className="block text-[10px] font-medium tracking-[0.2em] text-ink-foreground/60">ROUTE 1 OFFICIAL</span>
           </span>
+          <img src={badge.url} alt="Tak Route 1 badge" className="size-10 object-contain" />
         </Link>
         <nav className="ml-4 hidden min-w-0 flex-1 items-center gap-3 overflow-x-auto xl:flex [&>a]:shrink-0 [&>a]:text-xs">
           {NAV.map((n) => <NavLink key={n.label} item={n} />)}
