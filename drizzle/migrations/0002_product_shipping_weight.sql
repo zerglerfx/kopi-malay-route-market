@@ -1,0 +1,2 @@
+ALTER TABLE public.products ADD COLUMN weight_kg numeric DEFAULT NULL;
+COMMENT ON COLUMN public.products.weight_kg IS 'Unit shipping weight in kilograms. NULL means not configured; required for Thailand tumbler shipping.';

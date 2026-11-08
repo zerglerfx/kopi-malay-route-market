@@ -1,4 +1,7 @@
 # Catalog update
+- [ ] Replace ten accessory listings/photos and verify exact dual prices.
+- [ ] Apply 20-unit accessory blocks and weight-based Thai tumbler shipping with configurable unit weights.
+- [ ] Verify updated catalog and checkout across destinations.
 - [x] Replace tumbler, sticker and magnet placeholders with uploaded products and exact dual prices.
 - [x] Merge apparel categories, add accessory categories, and apply S–5XL sizes.
 - [x] Apply Thailand free shipping and Malaysia quantity-block shipping throughout checkout and receipts.

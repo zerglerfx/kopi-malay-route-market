@@ -185,6 +185,7 @@ export type Database = {
           slug: string
           stock_qty: number
           variants: Json
+          weight_kg: number | null
         }
         Insert: {
           category_id: string
@@ -201,6 +202,7 @@ export type Database = {
           slug: string
           stock_qty?: number
           variants?: Json
+          weight_kg?: number | null
         }
         Update: {
           category_id?: string
@@ -217,6 +219,7 @@ export type Database = {
           slug?: string
           stock_qty?: number
           variants?: Json
+          weight_kg?: number | null
         }
         Relationships: [
           {

@@ -15,6 +15,13 @@
       "when": 1794060373397,
       "tag": "0001_catalog_destination_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794101166162,
+      "tag": "0002_product_shipping_weight",
+      "breakpoints": true
     }
   ]
 }
