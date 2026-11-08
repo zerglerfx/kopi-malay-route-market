@@ -47,7 +47,7 @@ describe("shipping", () => {
   });
 });
 
-it("offers S through 5XL for apparel", () => expect(APPAREL_SIZES).toEqual(["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]));
+it("offers XS through 5XL for apparel", () => expect(APPAREL_SIZES).toEqual(["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]));
 it("formats Thai prices without currency conversion", () => expect(formatMoney(259, "thb")).toBe("THB 259.00"));
 
 describe("currency", () => {
