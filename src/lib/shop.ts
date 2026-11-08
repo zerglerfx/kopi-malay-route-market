@@ -73,10 +73,15 @@ export function isEastMalaysia(state: string): boolean {
   return EAST.has(state);
 }
 
-export type Country = "Malaysia" | "Thailand";
+export type Country = "Malaysia" | "Thailand" | "Singapore";
 export const APPAREL_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
 export type ShippingLine = { category_slug: string; quantity: number; weight_kg?: number | null };
-export function shippingFee(country: Country, lines: ShippingLine[]): number | null {
+export function eastMalaysiaSurcharge(country: Country, state: string): number {
+  return country === "Malaysia" && ["Sabah", "Sarawak"].includes(state) ? 10 : 0;
+}
+export const SINGAPORE_NOTICE = "Direct shipping to Singapore is unavailable. Please arrange self-pickup or delivery through a close contact or friend in Peninsular Malaysia.";
+export function shippingFee(country: Country, lines: ShippingLine[], state = ""): number | null {
+  if (country === "Singapore") return null;
   if (country === "Thailand") {
     const tumblers = lines.filter((line) => line.category_slug === "tumblers" && line.quantity > 0);
     if (!tumblers.length) return 0;
@@ -90,18 +95,19 @@ export function shippingFee(country: Country, lines: ShippingLine[]): number | n
     else if (["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(line.category_slug)) apparel += line.quantity;
     else accessories += line.quantity;
   }
-  return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 20));
+  return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 20)) + eastMalaysiaSurcharge(country, state);
 }
 export function destinationPrice(p: Product, country: Country): number | null {
-  return country === "Thailand" ? p.price_thb : effectivePrice(p);
+  return country === "Singapore" ? null : country === "Thailand" ? p.price_thb : effectivePrice(p);
 }
 export function formatMoney(value: number, currency: string): string {
   return `${currency.toLowerCase() === "thb" ? "THB" : "RM"} ${value.toFixed(2)}`;
 }
 export function shippingDescription(category: string): string {
   const block = category === "tumblers" ? "2 tumblers" : ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category) ? "2 apparel items" : "20 accessories";
+  const apparel = ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category);
   const thailand = category === "tumblers" ? "Thailand: THB 60.00 for total tumbler weight under 1kg. Checkout is unavailable until unit weights are configured; orders of 1kg or more require a shipping quote." : "Free shipping to Thailand.";
-  return `${thailand} Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately.`;
+  return `${thailand} Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately. Sabah & Sarawak: an additional flat RM 10.00 per order.${apparel ? ` Shipped from Tak, Thailand across the border via Peninsular Malaysia. ${SINGAPORE_NOTICE}` : ""}`;
 }
 
 export function deliveryEstimate(state: string): string {

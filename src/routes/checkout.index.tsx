@@ -7,7 +7,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { productsQuery } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { createCheckoutSession } from "@/lib/checkout.functions";
-import { destinationPrice, formatMoney, imageFor, MY_STATES, shippingFee, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, imageFor, MY_STATES, shippingFee, SINGAPORE_NOTICE, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
@@ -44,7 +44,8 @@ function Checkout() {
   });
   const unavailable = lines.some((line) => line.price == null);
   const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
-  const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null })));
+  const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null })), f.state);
+  const surcharge = eastMalaysiaSurcharge(country, f.state);
 
   useEffect(() => { if (cancelled) toast.warning("Payment was cancelled — your cart is still saved."); }, [cancelled]);
   useEffect(() => { const email = user?.email; if (email) setF((p) => (p.email ? p : { ...p, email })); }, [user]);
@@ -53,6 +54,7 @@ function Checkout() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (country === "Singapore") { toast.warning(SINGAPORE_NOTICE); return; }
     if (unavailable) { toast.warning("Some items are unavailable for this destination."); return; }
     if (ship == null) { toast.warning("Please contact Kopi Malay for a Thailand tumbler shipping quote."); return; }
     if (!f.state) { toast.warning("Please choose your state"); return; }
@@ -88,9 +90,11 @@ function Checkout() {
           </section>
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold uppercase">Shipping address</h2>
-            <select aria-label="Country" value={country} onChange={(e) => { setCountry(e.target.value === "Thailand" ? "Thailand" : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }} className={field}>
-              <option>Malaysia</option><option>Thailand</option>
+            <select aria-label="Country" value={country} onChange={(e) => { const value = e.target.value; setCountry(value === "Thailand" || value === "Singapore" ? value : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }} className={field}>
+              <option>Malaysia</option><option>Thailand</option><option>Singapore</option>
             </select>
+            {country === "Singapore" && <p role="alert" className="text-sm text-sale">{SINGAPORE_NOTICE}</p>}
+            {lines.some((line) => line.product?.category_slug === "jerseys-t-shirts") && country === "Malaysia" && <p className="text-sm text-muted-foreground">Shipped from Tak, Thailand across the border via Peninsular Malaysia.</p>}
             <input required placeholder="Full name" value={f.name} onChange={set("name")} className={field} />
             <input required placeholder="Address" value={f.address} onChange={set("address")} className={field} />
             <div className="grid gap-3 sm:grid-cols-3">
@@ -117,14 +121,15 @@ function Checkout() {
           <dl className="mt-4 space-y-1 border-t pt-4 text-sm">
             <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
+            {surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(subtotal + ship)}</dd></div>
           </dl>
-          {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
-          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
+          {unavailable && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
+          {ship == null && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
           <Button type="submit" disabled={busy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Redirecting…" : "Pay with Stripe"}
           </Button>
-          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately.</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
         </aside>
       </form>
     </div>

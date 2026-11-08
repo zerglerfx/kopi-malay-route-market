@@ -8,7 +8,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PriceTag } from "@/components/product-card";
 import { useCart } from "@/hooks/use-cart";
 import { productQuery } from "@/lib/queries";
-import { imageFor, isApparel, shippingDescription } from "@/lib/shop";
+import { isApparel, shippingDescription } from "@/lib/shop";
+import { ProductImageViewer } from "@/components/product-image-viewer";
+import { ApparelSizeGuide } from "@/components/apparel-size-guide";
 
 export const Route = createFileRoute("/product/$slug")({
   loader: async ({ context, params }) => {
@@ -40,12 +42,10 @@ function ProductPage() {
   const { data: p } = useSuspenseQuery(productQuery(slug));
   const { add, setOpen } = useCart();
   const navigate = useNavigate();
-  const [img, setImg] = useState(0);
   const [size, setSize] = useState("");
   const [qty, setQty] = useState(1);
   if (!p) return null;
   const apparel = isApparel(p);
-  const gallery = Array.from(new Set(p.images.length ? p.images : [""]));
   const ready = !apparel || !!size;
 
   const doAdd = async (buy: boolean) => {
@@ -57,27 +57,14 @@ function ProductPage() {
 
   return (
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 md:grid-cols-2 md:gap-12">
-      <div>
-        <div className="aspect-square overflow-hidden rounded-lg border bg-muted">
-          <img src={imageFor(gallery[img])} alt={p.name} width={1024} height={1024} className="size-full object-contain" />
-        </div>
-        {gallery.length > 1 && (
-          <div className="mt-3 flex gap-2">
-            {gallery.map((g, i) => (
-              <button key={g + i} onClick={() => setImg(i)} className={`size-20 overflow-hidden rounded-md border-2 ${i === img ? "border-primary" : "border-transparent"}`}>
-                <img src={imageFor(g)} alt="" loading="lazy" className="size-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <ProductImageViewer key={p.id} images={p.images} name={p.name} />
       <div>
         <Link to="/shop/$category" params={{ category: p.category_slug }} className="text-xs uppercase tracking-widest text-primary">{p.category_name}</Link>
         <h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">{p.name}</h1>
         <PriceTag p={p} className="mt-3 text-xl" />
         {apparel && (
           <div className="mt-6">
-            <p className="mb-2 font-display text-sm font-semibold uppercase">Size {size && <span className="text-muted-foreground">— {size}</span>}</p>
+            <div className="mb-3 flex items-center justify-between gap-3"><p className="font-display text-sm font-semibold uppercase">Size {size && <span className="text-muted-foreground">— {size}</span>}</p><ApparelSizeGuide /></div>
             <div className="flex flex-wrap gap-2">
               {(p.variants.sizes ?? []).map((s) => (
                 <Button variant="outline" key={s} onClick={() => setSize(s)} className={`min-w-12 px-3 font-medium ${size === s ? "border-ink bg-ink text-ink-foreground" : "bg-card hover:border-ink"}`}>{s}</Button>
@@ -102,7 +89,7 @@ function ProductPage() {
           <AccordionItem value="desc"><AccordionTrigger className="font-display uppercase">Description</AccordionTrigger><AccordionContent>{p.description}</AccordionContent></AccordionItem>
           {apparel && (
             <AccordionItem value="size"><AccordionTrigger className="font-display uppercase">Size guide</AccordionTrigger>
-              <AccordionContent>Available sizes: {(p.variants.sizes ?? []).join(" · ")}. Measurements are not yet available.</AccordionContent>
+              <AccordionContent><ApparelSizeGuide /></AccordionContent>
             </AccordionItem>
           )}
           <AccordionItem value="ship"><AccordionTrigger className="font-display uppercase">Shipping</AccordionTrigger>

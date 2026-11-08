@@ -2,6 +2,24 @@ import { describe, expect, it } from "vitest";
 import { APPAREL_SIZES, formatMoney, formatRM, mergeCartLines, shippingFee } from "@/lib/shop";
 
 describe("shipping", () => {
+  it("ships jerseys free to Thailand", () => {
+    expect(shippingFee("Thailand", [{ category_slug: "jerseys-t-shirts", quantity: 4 }], "Tak")).toBe(0);
+  });
+  it("disables direct Singapore shipping", () => {
+    expect(shippingFee("Singapore", [{ category_slug: "jerseys-t-shirts", quantity: 1 }])).toBeNull();
+  });
+  it("adds RM 10 once in Sabah across all categories", () => {
+    for (const category_slug of ["jerseys-t-shirts", "tumblers", "stickers", "fridge-magnets", "patches", "lanyard", "other-merch"]) {
+      expect(shippingFee("Malaysia", [{ category_slug, quantity: 1 }], "Sabah")).toBe(30);
+    }
+    expect(shippingFee("Malaysia", [{ category_slug: "jerseys-t-shirts", quantity: 3 }, { category_slug: "tumblers", quantity: 2 }, { category_slug: "stickers", quantity: 21 }], "Sabah")).toBe(110);
+  });
+  it("adds RM 10 once in Sarawak", () => {
+    expect(shippingFee("Malaysia", [{ category_slug: "jerseys-t-shirts", quantity: 4 }], "Sarawak")).toBe(50);
+  });
+  it("keeps the base rate elsewhere including Labuan", () => {
+    for (const state of ["Johor", "Selangor", "Labuan"]) expect(shippingFee("Malaysia", [{ category_slug: "jerseys-t-shirts", quantity: 2 }], state)).toBe(20);
+  });
   it("ships accessories free to Thailand", () => {
     expect(shippingFee("Thailand", [{ category_slug: "stickers", quantity: 99 }, { category_slug: "fridge-magnets", quantity: 21 }, { category_slug: "patches", quantity: 3 }, { category_slug: "lanyard", quantity: 2 }, { category_slug: "other-merch", quantity: 1 }])).toBe(0);
   });

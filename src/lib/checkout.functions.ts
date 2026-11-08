@@ -60,7 +60,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     });
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
-    const ship = shippingFee(data.country, lines);
+    const ship = shippingFee(data.country, lines, data.state);
     if (ship == null) throw new Error("Thailand tumbler shipping requires configured unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.");
     const currency = data.country === "Thailand" ? "thb" : "myr";
     const orderNumber = `KM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
