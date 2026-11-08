@@ -40,7 +40,7 @@ export function SiteHeader() {
           {menu ? <X className="size-6" /> : <Menu className="size-6" />}
         </button>
         <Link to="/" className="flex items-center gap-2">
-          <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-10 rounded-full bg-cream object-contain p-0.5" />
+          <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-10 rounded-full bg-background object-contain p-0.5" />
           <img src={badge.url} alt="Tak Route 1 badge" className="size-10 object-contain" />
           <span className="font-display text-lg font-bold leading-none">
             KOPI MALAY<span className="block text-[10px] font-medium tracking-[0.2em] text-ink-foreground/60">ROUTE 1 OFFICIAL</span>
