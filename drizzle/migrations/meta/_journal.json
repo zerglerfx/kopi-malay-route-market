@@ -22,6 +22,13 @@
       "when": 1794101166162,
       "tag": "0002_product_shipping_weight",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794143015300,
+      "tag": "0003_manual_qr_orders",
+      "breakpoints": true
     }
   ]
 }

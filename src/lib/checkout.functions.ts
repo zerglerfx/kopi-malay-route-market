@@ -1,17 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import Stripe from "stripe";
-import { effectivePrice, MY_STATES, shippingFee } from "./shop";
-
-function stripe() {
-  const key = process.env["STRIPE_SECRET_KEY"];
-  if (!key) throw new Error("Payments are not configured yet.");
-  return new Stripe(key, { httpClient: Stripe.createFetchHttpClient() });
-}
+import { effectivePrice, formatMoney, MY_STATES, shippingFee } from "./shop";
+import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
 
 const CheckoutInput = z.object({
-  email: z.string().email().max(255),
+  email: z.string().trim().email().max(255),
   name: z.string().trim().min(1).max(120),
   phone: z.string().trim().min(6).max(30),
   address: z.string().trim().min(3).max(300),
@@ -19,6 +13,7 @@ const CheckoutInput = z.object({
   country: z.enum(["Malaysia", "Thailand"]),
   state: z.string().trim().min(1).max(100),
   postcode: z.string().regex(/^\d{5}$/),
+  ref: z.string().regex(ORDER_REF_RE).optional(),
   items: z.array(z.object({
     productId: z.string().uuid(),
     variant: z.string().max(20),
@@ -30,20 +25,59 @@ const CheckoutInput = z.object({
   }
 });
 
-export const createCheckoutSession = createServerFn({ method: "POST" })
-  .inputValidator((d: z.infer<typeof CheckoutInput>) => CheckoutInput.parse(d))
+function magicOk(bytes: Uint8Array, type: string): boolean {
+  if (type === "image/png") return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  if (type === "image/jpeg") return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (type === "application/pdf") return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+  return false;
+}
+
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+async function notifyTelegram(text: string, receiptUrl: string, isPdf: boolean) {
+  const lovableKey = process.env["LOVABLE_API_KEY"];
+  const tgKey = process.env["TELEGRAM_API_KEY"];
+  if (!lovableKey || !tgKey) { console.error("Telegram not configured"); return; }
+  const base = "https://connector-gateway.lovable.dev/telegram";
+  const headers = { Authorization: `Bearer ${lovableKey}`, "X-Connection-Api-Key": tgKey, "Content-Type": "application/json" };
+  let chatId = process.env["TELEGRAM_CHAT_ID"];
+  if (!chatId) {
+    const r = await fetch(`${base}/getUpdates`, { method: "POST", headers, body: "{}" });
+    const j = (await r.json()) as { result?: { message?: { chat?: { id: number } }; my_chat_member?: { chat?: { id: number } } }[] };
+    const last = [...(j.result ?? [])].reverse().find((u) => u.message?.chat?.id ?? u.my_chat_member?.chat?.id);
+    const id = last?.message?.chat?.id ?? last?.my_chat_member?.chat?.id;
+    if (!id) { console.error("No Telegram chat found; message the bot first"); return; }
+    chatId = String(id);
+  }
+  const res = await fetch(`${base}/sendMessage`, { method: "POST", headers, body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }) });
+  if (!res.ok) console.error(`Telegram sendMessage failed [${res.status}]: ${await res.text()}`);
+  const doc = await fetch(`${base}/${isPdf ? "sendDocument" : "sendPhoto"}`, { method: "POST", headers, body: JSON.stringify({ chat_id: chatId, [isPdf ? "document" : "photo"]: receiptUrl }) });
+  if (!doc.ok) console.error(`Telegram receipt send failed [${doc.status}]: ${await doc.text()}`);
+}
+
+export const submitManualOrder = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => {
+    if (!(d instanceof FormData)) throw new Error("Invalid form");
+    const file = d.get("receipt");
+    if (!(file instanceof File)) throw new Error("Please upload your payment proof.");
+    const err = receiptError(file);
+    if (err) throw new Error(err);
+    const payload = CheckoutInput.parse(JSON.parse(String(d.get("payload") ?? "{}")));
+    return { ...payload, receipt: file };
+  })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const req = getRequest();
-    const origin = req.headers.get("origin") ?? new URL(req.url).origin;
 
-    // Optional signed-in user
     let userId: string | null = null;
     const auth = req.headers.get("authorization");
     if (auth?.startsWith("Bearer ")) {
       const { data: u } = await supabaseAdmin.auth.getUser(auth.slice(7));
       userId = u.user?.id ?? null;
     }
+
+    const bytes = new Uint8Array(await data.receipt.arrayBuffer());
+    if (!magicOk(bytes, data.receipt.type)) throw new Error("Receipt file looks invalid. Please upload a PNG, JPG or PDF.");
 
     const ids = [...new Set(data.items.map((i) => i.productId))];
     const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,weight_kg,variants,categories(slug)").eq("is_active", true).in("id", ids);
@@ -61,82 +95,79 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
     const ship = shippingFee(data.country, lines, data.state);
-    if (ship == null) throw new Error("Thailand tumbler shipping requires configured unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.");
+    if (ship == null) throw new Error("Thailand tumbler shipping requires a quote. Please contact Kopi Malay.");
     const currency = data.country === "Thailand" ? "thb" : "myr";
-    const orderNumber = `KM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const total = subtotal + ship;
+    const token = crypto.randomUUID();
+    const ext = data.receipt.type === "application/pdf" ? "pdf" : data.receipt.type === "image/png" ? "png" : "jpg";
 
-    const { data: order, error: oErr } = await supabaseAdmin.from("orders").insert({
-      order_number: orderNumber,
-      user_id: userId,
-      guest_email: data.email,
-      currency,
-      shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
-      subtotal, shipping_fee: ship, total_amount: subtotal + ship,
-    }).select("id").single();
-    if (oErr) throw new Error(oErr.message);
+    let order: { id: string; order_number: string } | null = null;
+    for (let attempt = 0; attempt < 5 && !order; attempt++) {
+      const ref = attempt === 0 && data.ref && ORDER_REF_RE.test(data.ref) ? data.ref : makeOrderRef();
+      const { data: o, error: oErr } = await supabaseAdmin.from("orders").insert({
+        order_number: ref, user_id: userId, guest_email: data.email, currency,
+        shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
+        subtotal, shipping_fee: ship, total_amount: total,
+        status: "pending_verification", payment_method: "DuitNow QR", access_token: token,
+      }).select("id, order_number").single();
+      if (o) order = o;
+      else if (oErr && oErr.code !== "23505") throw new Error("Could not save your order. Please try again.");
+    }
+    if (!order) throw new Error("Could not create an order reference. Please try again.");
+
+    const path = `${order.order_number}/${token}.${ext}`;
+    const { error: upErr } = await supabaseAdmin.storage.from("payment-receipts").upload(path, bytes, { contentType: data.receipt.type });
+    if (upErr) throw new Error("Could not upload your receipt. Please try again.");
+    await supabaseAdmin.from("orders").update({ receipt_path: path }).eq("id", order.id);
 
     const { error: itemsError } = await supabaseAdmin.from("order_items").insert(lines.map((l) => ({
       order_id: order.id, product_id: l.productId, product_name: l.name, selected_variant: l.variant, unit_price: l.unit, quantity: l.quantity,
     })));
     if (itemsError) throw new Error("Could not save your order items. Please try again.");
+    if (userId) await supabaseAdmin.from("cart_items").delete().eq("user_id", userId);
 
-    const session = await stripe().checkout.sessions.create({
-      mode: "payment",
-      customer_email: data.email,
-      line_items: lines.map((l) => ({
-        quantity: l.quantity,
-        price_data: {
-          currency,
-          unit_amount: Math.round(l.unit * 100),
-          product_data: { name: l.variant ? `${l.name} (${l.variant})` : l.name },
-        },
-      })),
-      shipping_options: [{
-        shipping_rate_data: {
-          type: "fixed_amount",
-          display_name: data.country === "Thailand" ? (ship === 0 ? "Free Thailand shipping" : "Thailand tumbler shipping — under 1kg") : "Malaysia quantity-based shipping",
-          fixed_amount: { amount: Math.round(ship * 100), currency },
-        },
-      }],
-      metadata: { order_id: order.id },
-      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/checkout?cancelled=1`,
-    });
+    try {
+      const { data: signed } = await supabaseAdmin.storage.from("payment-receipts").createSignedUrl(path, 60 * 60 * 24 * 7);
+      const url = signed?.signedUrl ?? "";
+      const m = (v: number) => formatMoney(v, currency);
+      const text = [
+        `🛒 <b>New order: ${order.order_number}</b>`,
+        `Status: Pending Verification`,
+        ``,
+        `👤 <b>${esc(data.name)}</b>`,
+        `${esc(data.email)} · ${esc(data.phone)}`,
+        ``,
+        `📍 ${esc(data.address)}, ${esc(data.city)} ${data.postcode}, ${esc(data.state)}, ${data.country}`,
+        ``,
+        `📦 <b>Items</b>`,
+        ...lines.map((l) => `• ${esc(l.name)}${l.variant ? ` (Size ${esc(l.variant)})` : ""} × ${l.quantity} — ${m(l.unit * l.quantity)}`),
+        ``,
+        `💰 Subtotal ${m(subtotal)} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
+        url ? `📄 <a href="${url}">View receipt</a> (link valid 7 days)` : `📄 Receipt saved (link unavailable)`,
+      ].join("\n");
+      await notifyTelegram(text, url, ext === "pdf");
+    } catch (e) {
+      console.error("Telegram notification failed", e);
+    }
 
-    await supabaseAdmin.from("orders").update({ stripe_session_id: session.id }).eq("id", order.id);
-    return { url: session.url };
+    return { ref: order.order_number, token };
   });
 
 export type OrderSummary = {
-  currency: string;
-  order_number: string; status: string; created_at: string; transaction_id: string | null;
+  currency: string; order_number: string; status: string; created_at: string;
   subtotal: number; shipping_fee: number; total_amount: number; email: string | null;
   shipping_address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string; country?: string };
   items: { product_name: string; selected_variant: string; unit_price: number; quantity: number }[];
 };
 
-export const getOrderBySession = createServerFn({ method: "GET" })
-  .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().regex(/^cs_[A-Za-z0-9_]+$/) }).parse(d))
+export const getOrderByReference = createServerFn({ method: "GET" })
+  .inputValidator((d: { ref: string; token: string }) => z.object({ ref: z.string().regex(ORDER_REF_RE), token: z.string().uuid() }).parse(d))
   .handler(async ({ data }): Promise<OrderSummary | null> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: order } = await supabaseAdmin.from("orders").select("*, order_items(*)").eq("stripe_session_id", data.sessionId).maybeSingle();
+    const { data: order } = await supabaseAdmin.from("orders").select("*, order_items(*)").eq("order_number", data.ref).eq("access_token", data.token).maybeSingle();
     if (!order) return null;
-
-    let status = order.status;
-    let pi = order.stripe_payment_intent_id;
-    if (status !== "paid") {
-      // Fallback in case the webhook hasn't arrived yet.
-      const s = await stripe().checkout.sessions.retrieve(data.sessionId);
-      if (s.payment_status === "paid") {
-        status = "paid";
-        pi = typeof s.payment_intent === "string" ? s.payment_intent : s.payment_intent?.id ?? null;
-        await supabaseAdmin.from("orders").update({ status, stripe_payment_intent_id: pi }).eq("id", order.id);
-        if (order.user_id) await supabaseAdmin.from("cart_items").delete().eq("user_id", order.user_id);
-      }
-    }
     return {
-      currency: order.currency,
-      order_number: order.order_number, status, created_at: order.created_at, transaction_id: pi,
+      currency: order.currency, order_number: order.order_number, status: order.status, created_at: order.created_at,
       subtotal: Number(order.subtotal), shipping_fee: Number(order.shipping_fee), total_amount: Number(order.total_amount),
       email: order.guest_email, shipping_address: order.shipping_address as OrderSummary["shipping_address"],
       items: (order.order_items ?? []).map((i: { product_name: string; selected_variant: string; unit_price: number; quantity: number }) => ({

@@ -11,12 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as OrderSuccessRouteImport } from './routes/order-success'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
-import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
 import { Route as ShopCategoryRouteImport } from './routes/shop.$category'
-import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe-webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,14 +27,14 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrderSuccessRoute = OrderSuccessRouteImport.update({
+  id: '/order-success',
+  path: '/order-success',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
   id: '/checkout/',
   path: '/checkout/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
-  id: '/checkout/success',
-  path: '/checkout/success',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductSlugRoute = ProductSlugRouteImport.update({
@@ -53,85 +52,73 @@ const ShopCategoryRoute = ShopCategoryRouteImport.update({
   path: '/shop/$category',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
-  id: '/api/public/stripe-webhook',
-  path: '/api/public/stripe-webhook',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/checkout/success': typeof CheckoutSuccessRoute
+  '/order-success': typeof OrderSuccessRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/shop/': typeof ShopIndexRoute
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/checkout/success': typeof CheckoutSuccessRoute
+  '/order-success': typeof OrderSuccessRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout': typeof CheckoutIndexRoute
   '/shop': typeof ShopIndexRoute
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
-  '/checkout/success': typeof CheckoutSuccessRoute
+  '/order-success': typeof OrderSuccessRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/shop/': typeof ShopIndexRoute
-  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/auth'
-    | '/checkout/success'
+    | '/order-success'
     | '/product/$slug'
     | '/shop/$category'
     | '/checkout/'
     | '/shop/'
-    | '/api/public/stripe-webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/auth'
-    | '/checkout/success'
+    | '/order-success'
     | '/product/$slug'
     | '/shop/$category'
     | '/checkout'
     | '/shop'
-    | '/api/public/stripe-webhook'
   id:
     | '__root__'
     | '/'
     | '/auth'
-    | '/checkout/success'
+    | '/order-success'
     | '/product/$slug'
     | '/shop/$category'
     | '/checkout/'
     | '/shop/'
-    | '/api/public/stripe-webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
-  CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  OrderSuccessRoute: typeof OrderSuccessRoute
   ProductSlugRoute: typeof ProductSlugRoute
   ShopCategoryRoute: typeof ShopCategoryRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   ShopIndexRoute: typeof ShopIndexRoute
-  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -150,18 +137,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/order-success': {
+      id: '/order-success'
+      path: '/order-success'
+      fullPath: '/order-success'
+      preLoaderRoute: typeof OrderSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout/': {
       id: '/checkout/'
       path: '/checkout'
       fullPath: '/checkout/'
       preLoaderRoute: typeof CheckoutIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/checkout/success': {
-      id: '/checkout/success'
-      path: '/checkout/success'
-      fullPath: '/checkout/success'
-      preLoaderRoute: typeof CheckoutSuccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/product/$slug': {
@@ -185,25 +172,17 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopCategoryRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/stripe-webhook': {
-      id: '/api/public/stripe-webhook'
-      path: '/api/public/stripe-webhook'
-      fullPath: '/api/public/stripe-webhook'
-      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
-  CheckoutSuccessRoute: CheckoutSuccessRoute,
+  OrderSuccessRoute: OrderSuccessRoute,
   ProductSlugRoute: ProductSlugRoute,
   ShopCategoryRoute: ShopCategoryRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   ShopIndexRoute: ShopIndexRoute,
-  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
