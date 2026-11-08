@@ -41,7 +41,7 @@ export function SiteHeader() {
         </button>
         <Link to="/" className="flex min-w-0 items-center gap-1.5 sm:gap-2" aria-label="Kopi Malay x Route 1 home">
           <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-8 shrink-0 rounded-full bg-background object-contain p-0.5 sm:size-10" />
-          <span className="min-w-0 whitespace-nowrap font-display text-[13px] font-bold leading-tight sm:text-lg sm:leading-none">
+          <span className="shrink-0 whitespace-nowrap font-display text-xs min-[380px]:text-sm font-bold leading-tight sm:text-lg sm:leading-none">
             <span className="block sm:inline">KOPI MALAY</span>
             <span className="text-signal"> x </span>ROUTE 1
           </span>
@@ -50,7 +50,7 @@ export function SiteHeader() {
         <nav className="ml-4 hidden min-w-0 flex-1 items-center gap-3 overflow-x-auto xl:flex [&>a]:shrink-0 [&>a]:text-xs">
           {NAV.map((n) => <NavLink key={n.label} item={n} />)}
         </nav>
-        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3 [&>*]:grid [&>*]:min-h-10 [&>*]:min-w-10 [&>*]:place-items-center sm:[&>*]:flex">
+        <div className="ml-auto flex shrink-0 items-center gap-0 sm:gap-3 [&>*]:grid [&>*]:min-h-10 [&>*]:min-w-9 sm:[&>*]:min-w-10 [&>*]:place-items-center sm:[&>*]:flex">
           <button aria-label="Search" onClick={() => setSearch(!search)}><Search className="size-5" /></button>
           {user ? (
             <button aria-label="Sign out" title={`Signed in as ${user.email} — click to sign out`} onClick={() => supabase.auth.signOut()} className="flex items-center gap-1 text-sm">
