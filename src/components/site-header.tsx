@@ -35,21 +35,22 @@ export function SiteHeader() {
 
   return (
     <header className="no-print sticky top-0 z-40 bg-ink text-ink-foreground">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4">
-        <button className="xl:hidden" aria-label="Menu" onClick={() => setMenu(!menu)}>
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:gap-4 sm:px-4">
+        <button className="grid size-10 shrink-0 place-items-center xl:hidden" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>
           {menu ? <X className="size-6" /> : <Menu className="size-6" />}
         </button>
-        <Link to="/" className="flex items-center gap-2">
-          <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-10 rounded-full bg-background object-contain p-0.5" />
-          <span className="font-display text-lg font-bold leading-none">
-            KOPI MALAY<span className="text-signal"> x </span>ROUTE 1
+        <Link to="/" className="flex min-w-0 items-center gap-1.5 sm:gap-2" aria-label="Kopi Malay x Route 1 home">
+          <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-8 shrink-0 rounded-full bg-background object-contain p-0.5 sm:size-10" />
+          <span className="min-w-0 font-display text-sm font-bold leading-tight sm:text-lg sm:leading-none">
+            <span className="block sm:inline">KOPI MALAY</span>
+            <span className="text-signal"> x </span>ROUTE 1
           </span>
-          <img src={badge.url} alt="Tak Route 1 badge" className="size-10 object-contain" />
+          <img src={badge.url} alt="Tak Route 1 badge" className="size-8 shrink-0 object-contain sm:size-10" />
         </Link>
         <nav className="ml-4 hidden min-w-0 flex-1 items-center gap-3 overflow-x-auto xl:flex [&>a]:shrink-0 [&>a]:text-xs">
           {NAV.map((n) => <NavLink key={n.label} item={n} />)}
         </nav>
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-3 [&>*]:grid [&>*]:min-h-10 [&>*]:min-w-10 [&>*]:place-items-center sm:[&>*]:flex">
           <button aria-label="Search" onClick={() => setSearch(!search)}><Search className="size-5" /></button>
           {user ? (
             <button aria-label="Sign out" title={`Signed in as ${user.email} — click to sign out`} onClick={() => supabase.auth.signOut()} className="flex items-center gap-1 text-sm">
