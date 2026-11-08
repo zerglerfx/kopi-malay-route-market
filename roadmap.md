@@ -1,5 +1,5 @@
 # Catalog update
-- [ ] Add nine uploaded products, retire apparel placeholders, add size guide and image zoom, and verify state-based checkout totals.
+- [x] Add nine uploaded products, retire apparel placeholders, add size guide and image zoom, and verify state-based checkout totals (Sabah/Sarawak RM 105, Peninsular RM 95, Thailand free apparel, Singapore blocked; Stripe RM 105 handoff; no payment submitted).
 - [x] Replace ten accessory listings/photos and verify exact dual prices.
 - [x] Apply 20-unit accessory blocks and weight-based Thai tumbler shipping with configurable unit weights.
 - [x] Verify updated catalog and checkout across destinations (ten listings, Malaysia totals, Thai free accessories, and quote-required tumblers; 12 shipping/cart tests passed).
