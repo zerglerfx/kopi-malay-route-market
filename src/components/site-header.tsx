@@ -42,7 +42,7 @@ export function SiteHeader() {
         <Link to="/" className="flex items-center gap-2">
           <img src={kopiLogo.url} alt="Kopi Malay official logo" className="size-10 rounded-full bg-background object-contain p-0.5" />
           <span className="font-display text-lg font-bold leading-none">
-            KOPI MALAY<span className="block text-[10px] font-medium tracking-[0.2em] text-ink-foreground/60">ROUTE 1 OFFICIAL</span>
+            KOPI MALAY<span className="text-signal"> x </span>ROUTE 1
           </span>
           <img src={badge.url} alt="Tak Route 1 badge" className="size-10 object-contain" />
         </Link>
