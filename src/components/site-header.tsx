@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import { useCart } from "@/hooks/use-cart";
 import { supabase } from "@/integrations/supabase/client";
-import badge from "@/assets/tak-route-1-shield-transparent.png.asset.json";
+import badge from "@/assets/tak-route-1-shield-white-border.png.asset.json";
 import kopiLogo from "@/assets/kopi-malay-official-logo.png.asset.json";
 
 export const NAV = [
