@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { effectivePrice, formatMoney, MY_STATES, shippingFee } from "./shop";
+import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
 
 const CheckoutInput = z.object({
@@ -14,6 +15,7 @@ const CheckoutInput = z.object({
   state: z.string().trim().min(1).max(100),
   postcode: z.string().regex(/^\d{5}$/),
   ref: z.string().regex(ORDER_REF_RE).optional(),
+  promoCode: z.string().trim().max(40).optional(),
   items: z.array(z.object({
     productId: z.string().uuid(),
     variant: z.string().max(20),
@@ -54,6 +56,38 @@ async function notifyTelegram(text: string, receiptUrl: string, isPdf: boolean) 
   const doc = await fetch(`${base}/${isPdf ? "sendDocument" : "sendPhoto"}`, { method: "POST", headers, body: JSON.stringify({ chat_id: chatId, [isPdf ? "document" : "photo"]: receiptUrl }) });
   if (!doc.ok) console.error(`Telegram receipt send failed [${doc.status}]: ${await doc.text()}`);
 }
+
+type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
+
+async function loadPromo(admin: Admin, code: string): Promise<Promo | null> {
+  const { data } = await admin.from("promo_codes").select("*").ilike("code", code.replace(/[%_\\]/g, "")).maybeSingle();
+  if (!data) return null;
+  const n = (v: unknown) => (v == null ? null : Number(v));
+  return { ...data, discount_value: Number(data.discount_value), discount_myr: n(data.discount_myr), discount_thb: n(data.discount_thb), min_order_myr: n(data.min_order_myr), min_order_thb: n(data.min_order_thb) } as Promo;
+}
+
+const PromoInput = z.object({
+  code: z.string().trim().min(1).max(40),
+  country: z.enum(["Malaysia", "Thailand"]),
+  items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(50) })).min(1).max(50),
+});
+
+export const validatePromoCode = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => PromoInput.parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ids = [...new Set(data.items.map((i) => i.productId))];
+    const { data: products } = await supabaseAdmin.from("products").select("id,price,sale_price,price_thb").eq("is_active", true).in("id", ids);
+    const subtotal = data.items.reduce((s, i) => {
+      const p = products?.find((x) => x.id === i.productId);
+      if (!p) return s;
+      const unit = data.country === "Thailand" ? Number(p.price_thb ?? 0) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
+      return s + unit * i.quantity;
+    }, 0);
+    const promo = await loadPromo(supabaseAdmin, data.code);
+    const r = computePromoDiscount(promo, subtotal, data.country === "Thailand" ? "thb" : "myr");
+    return r.ok ? { ok: true as const, code: promo!.code.toUpperCase(), discount: r.discount, label: r.label } : { ok: false as const, error: r.error };
+  });
 
 export const submitManualOrder = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => {
@@ -97,7 +131,18 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     const ship = shippingFee(data.country, lines, data.state);
     if (ship == null) throw new Error("Thailand tumbler shipping requires a quote. Please contact Kopi Malay.");
     const currency = data.country === "Thailand" ? "thb" : "myr";
-    const total = subtotal + ship;
+    let promoCode: string | null = null;
+    let discount = 0;
+    if (data.promoCode) {
+      const promo = await loadPromo(supabaseAdmin, data.promoCode);
+      const r = computePromoDiscount(promo, subtotal, currency);
+      if (!r.ok) throw new Error(`Promo code: ${r.error}`);
+      const { data: redeemed } = await supabaseAdmin.rpc("redeem_promo_code", { _code: promo!.code });
+      if (!redeemed) throw new Error("Promo code: Invalid or expired promo code");
+      promoCode = promo!.code.toUpperCase();
+      discount = r.discount;
+    }
+    const total = subtotal - discount + ship;
     const token = crypto.randomUUID();
     const ext = data.receipt.type === "application/pdf" ? "pdf" : data.receipt.type === "image/png" ? "png" : "jpg";
 
@@ -107,7 +152,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       const { data: o, error: oErr } = await supabaseAdmin.from("orders").insert({
         order_number: ref, user_id: userId, guest_email: data.email, currency,
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
-        subtotal, shipping_fee: ship, total_amount: total,
+        subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
         status: "pending_verification", payment_method: "DuitNow QR", access_token: token,
       }).select("id, order_number").single();
       if (o) order = o;
@@ -142,7 +187,8 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         `📦 <b>Items</b>`,
         ...lines.map((l) => `• ${esc(l.name)}${l.variant ? ` (Size ${esc(l.variant)})` : ""} × ${l.quantity} — ${m(l.unit * l.quantity)}`),
         ``,
-        `💰 Subtotal ${m(subtotal)} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
+        ...(promoCode ? [`🎟️ Promo Code Applied: ${esc(promoCode)} (-${m(discount)})`] : []),
+        `💰 Subtotal ${m(subtotal)}${discount ? ` − Discount ${m(discount)}` : ""} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
         url ? `📄 <a href="${url}">View receipt</a> (link valid 7 days)` : `📄 Receipt saved (link unavailable)`,
       ].join("\n");
       await notifyTelegram(text, url, ext === "pdf");
@@ -155,7 +201,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
 
 export type OrderSummary = {
   currency: string; order_number: string; status: string; created_at: string;
-  subtotal: number; shipping_fee: number; total_amount: number; email: string | null;
+  subtotal: number; shipping_fee: number; total_amount: number; promo_code: string | null; discount_amount: number; email: string | null;
   shipping_address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string; country?: string };
   items: { product_name: string; selected_variant: string; unit_price: number; quantity: number }[];
 };
@@ -169,6 +215,7 @@ export const getOrderByReference = createServerFn({ method: "GET" })
     return {
       currency: order.currency, order_number: order.order_number, status: order.status, created_at: order.created_at,
       subtotal: Number(order.subtotal), shipping_fee: Number(order.shipping_fee), total_amount: Number(order.total_amount),
+      promo_code: order.promo_code, discount_amount: Number(order.discount_amount ?? 0),
       email: order.guest_email, shipping_address: order.shipping_address as OrderSummary["shipping_address"],
       items: (order.order_items ?? []).map((i: { product_name: string; selected_variant: string; unit_price: number; quantity: number }) => ({
         product_name: i.product_name, selected_variant: i.selected_variant, unit_price: Number(i.unit_price), quantity: i.quantity,
