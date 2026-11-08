@@ -6,7 +6,7 @@ import { useCart } from "@/hooks/use-cart";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { productsQuery } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
-import { submitManualOrder } from "@/lib/checkout.functions";
+import { submitManualOrder, validatePromoCode } from "@/lib/checkout.functions";
 import { makeOrderRef, receiptError } from "@/lib/manual-order";
 import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
@@ -54,6 +54,25 @@ function Checkout() {
   const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
   const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null })), f.state);
   const surcharge = eastMalaysiaSurcharge(country, f.state);
+  const checkPromo = useServerFn(validatePromoCode);
+  const [promoInput, setPromoInput] = useState("");
+  const [promo, setPromo] = useState<{ code: string; discount: number; label: string } | null>(null);
+  const [promoErr, setPromoErr] = useState<string | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const discount = promo ? Math.min(promo.discount, subtotal) : 0;
+  const payable = subtotal - discount + (ship ?? 0);
+  const promoItemsKey = items.map((i) => `${i.productId}:${i.quantity}`).join(",");
+  const applyPromo = async (code: string) => {
+    if (!code.trim() || country === "Singapore") return;
+    setPromoBusy(true); setPromoErr(null);
+    try {
+      const r = await checkPromo({ data: { code: code.trim(), country, items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })) } });
+      if (r.ok) setPromo({ code: r.code, discount: r.discount, label: r.label });
+      else { setPromo(null); setPromoErr(r.error); }
+    } catch { setPromo(null); setPromoErr("Could not check this code. Please try again."); }
+    setPromoBusy(false);
+  };
+  useEffect(() => { if (promo) void applyPromo(promo.code); }, [country, promoItemsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (cancelled) toast.warning("Payment was cancelled — your cart is still saved."); }, [cancelled]);
   useEffect(() => { const email = user?.email; if (email) setF((p) => (p.email ? p : { ...p, email })); }, [user]);
@@ -71,7 +90,7 @@ function Checkout() {
     setBusy(true);
     try {
       const fd = new FormData();
-      fd.append("payload", JSON.stringify({ ...f, country, ref, items: items.map((i) => ({ productId: i.productId, variant: i.variant, quantity: i.quantity })) }));
+      fd.append("payload", JSON.stringify({ ...f, country, ref, promoCode: promo?.code, items: items.map((i) => ({ productId: i.productId, variant: i.variant, quantity: i.quantity })) }));
       fd.append("receipt", receipt);
       const res = await create({ data: fd });
       await navigate({ to: "/order-success", search: { ref: res.ref, t: res.token } });
@@ -127,7 +146,7 @@ function Checkout() {
                 <div className="space-y-3 text-sm">
                   <div className="rounded-md border bg-background p-3">
                     <p className="text-muted-foreground">Amount to pay</p>
-                    <p className="font-display text-2xl font-bold">{unavailable || ship == null ? "—" : money(subtotal + ship)}</p>
+                    <p className="font-display text-2xl font-bold">{unavailable || ship == null ? "—" : money(payable)}</p>
                     <p className="mt-2 text-muted-foreground">Payment reference (put this in your transfer note)</p>
                     <div className="flex items-center gap-2">
                       <span className="font-display text-xl font-bold">{ref || "…"}</span>
@@ -160,10 +179,26 @@ function Checkout() {
             ))}
           </ul>
           <dl className="mt-4 space-y-1 border-t pt-4 text-sm">
+            <div className="mb-3 space-y-2">
+              <label htmlFor="promo" className="font-medium">Promo Code / Discount</label>
+              {promo ? (
+                <div className="flex items-center justify-between rounded-md border border-primary bg-primary/10 px-3 py-2">
+                  <span className="font-display font-semibold text-primary">✓ {promo.code} applied</span>
+                  <button type="button" onClick={() => { setPromo(null); setPromoInput(""); }} className="text-xs underline">Remove</button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input id="promo" value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void applyPromo(promoInput); } }} placeholder="Enter code" className={field} />
+                  <Button type="button" variant="outline" disabled={promoBusy || !promoInput.trim() || country === "Singapore"} onClick={() => void applyPromo(promoInput)}>{promoBusy ? "…" : "Apply"}</Button>
+                </div>
+              )}
+              {promoErr && <p role="alert" className="text-sm text-sale">{promoErr}</p>}
+            </div>
             <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
+            {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
             {surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
-            <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(subtotal + ship)}</dd></div>
+            <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
           </dl>
           {unavailable && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
           {ship == null && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}

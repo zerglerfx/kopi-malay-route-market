@@ -64,6 +64,7 @@ function OrderSuccess() {
         </ul>
         <dl className="mt-4 space-y-1">
           <div className="flex justify-between"><dt>Subtotal</dt><dd>{money(order.subtotal)}</dd></div>
+          {order.discount_amount > 0 && <div className="flex justify-between text-primary"><dt>Promo {order.promo_code}</dt><dd>- {money(order.discount_amount)}</dd></div>}
           <div className="flex justify-between"><dt>Shipping</dt><dd>{order.shipping_fee === 0 ? "Free" : money(order.shipping_fee)}</dd></div>
           <div className="flex justify-between font-display text-lg font-bold"><dt>Total payable</dt><dd>{money(order.total_amount)}</dd></div>
         </dl>
