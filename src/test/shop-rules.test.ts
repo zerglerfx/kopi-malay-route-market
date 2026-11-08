@@ -2,8 +2,16 @@ import { describe, expect, it } from "vitest";
 import { APPAREL_SIZES, formatMoney, formatRM, mergeCartLines, shippingFee } from "@/lib/shop";
 
 describe("shipping", () => {
-  it("ships every group free to Thailand", () => {
-    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 30 }, { category_slug: "jerseys-t-shirts", quantity: 7 }, { category_slug: "stickers", quantity: 99 }])).toBe(0);
+  it("ships accessories free to Thailand", () => {
+    expect(shippingFee("Thailand", [{ category_slug: "stickers", quantity: 99 }, { category_slug: "fridge-magnets", quantity: 21 }, { category_slug: "patches", quantity: 3 }, { category_slug: "lanyard", quantity: 2 }, { category_slug: "other-merch", quantity: 1 }])).toBe(0);
+  });
+  it("charges a flat THB 60 for tumbler weight under 1kg, even mixed with accessories", () => {
+    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 3, weight_kg: 0.3 }, { category_slug: "stickers", quantity: 99 }])).toBe(60);
+  });
+  it("requires a quote for unknown tumbler weights or weights of 1kg and above", () => {
+    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 1 }])).toBeNull();
+    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 2, weight_kg: 0.5 }])).toBeNull();
+    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 3, weight_kg: 0.5 }])).toBeNull();
   });
   it("charges RM 20 for every two tumblers", () => {
     expect([1, 2, 3, 4, 5].map((quantity) => shippingFee("Malaysia", [{ category_slug: "tumblers", quantity }]))).toEqual([20, 20, 40, 40, 60]);
@@ -11,12 +19,13 @@ describe("shipping", () => {
   it("charges RM 20 for every two jerseys", () => {
     expect([1, 2, 3, 4, 5].map((quantity) => shippingFee("Malaysia", [{ category_slug: "jerseys-t-shirts", quantity }]))).toEqual([20, 20, 40, 40, 60]);
   });
-  it("aggregates accessories in blocks of ten", () => {
-    expect(shippingFee("Malaysia", [{ category_slug: "stickers", quantity: 5 }, { category_slug: "fridge-magnets", quantity: 5 }])).toBe(20);
-    expect(shippingFee("Malaysia", [{ category_slug: "patches", quantity: 9 }, { category_slug: "lanyard", quantity: 1 }, { category_slug: "other-merch", quantity: 1 }])).toBe(40);
+  it("aggregates accessories in blocks of twenty", () => {
+    expect([1, 20, 21, 40, 41].map((quantity) => shippingFee("Malaysia", [{ category_slug: "stickers", quantity }]))).toEqual([20, 20, 40, 40, 60]);
+    expect(shippingFee("Malaysia", [{ category_slug: "patches", quantity: 9 }, { category_slug: "lanyard", quantity: 10 }, { category_slug: "other-merch", quantity: 1 }])).toBe(20);
+    expect(shippingFee("Malaysia", [{ category_slug: "stickers", quantity: 10 }, { category_slug: "fridge-magnets", quantity: 11 }])).toBe(40);
   });
   it("adds distinct shipping groups", () => {
-    expect(shippingFee("Malaysia", [{ category_slug: "tumblers", quantity: 3 }, { category_slug: "jerseys-t-shirts", quantity: 2 }, { category_slug: "stickers", quantity: 11 }])).toBe(100);
+    expect(shippingFee("Malaysia", [{ category_slug: "tumblers", quantity: 3 }, { category_slug: "jerseys-t-shirts", quantity: 2 }, { category_slug: "stickers", quantity: 21 }])).toBe(100);
   });
 });
 

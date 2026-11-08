@@ -44,7 +44,7 @@ function Checkout() {
   });
   const unavailable = lines.some((line) => line.price == null);
   const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
-  const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch" })));
+  const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null })));
 
   useEffect(() => { if (cancelled) toast.warning("Payment was cancelled — your cart is still saved."); }, [cancelled]);
   useEffect(() => { const email = user?.email; if (email) setF((p) => (p.email ? p : { ...p, email })); }, [user]);
@@ -54,6 +54,7 @@ function Checkout() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (unavailable) { toast.warning("Some items are unavailable for this destination."); return; }
+    if (ship == null) { toast.warning("Please contact Kopi Malay for a Thailand tumbler shipping quote."); return; }
     if (!f.state) { toast.warning("Please choose your state"); return; }
     setBusy(true);
     try {
@@ -115,14 +116,15 @@ function Checkout() {
           </ul>
           <dl className="mt-4 space-y-1 border-t pt-4 text-sm">
             <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
-            <div className="flex justify-between"><dt>Shipping</dt><dd>{ship === 0 ? "Free" : money(ship)}</dd></div>
-            <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable ? "—" : money(subtotal + ship)}</dd></div>
+            <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
+            <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(subtotal + ship)}</dd></div>
           </dl>
           {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
-          <Button type="submit" disabled={busy || unavailable} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
+          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
+          <Button type="submit" disabled={busy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Redirecting…" : "Pay with Stripe"}
           </Button>
-          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: free. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 10 accessories. Each group is charged separately.</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately.</p>
         </aside>
       </form>
     </div>

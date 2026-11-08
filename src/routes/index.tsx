@@ -70,7 +70,7 @@ function Home() {
 
       <section className="bg-primary text-primary-foreground">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-14 md:grid-cols-3">
-          {[["1,864", "Curves on the Mae Hong Son Loop"], ["FREE", "Shipping across Thailand"], ["RM 20", "Malaysia quantity-block shipping"]].map(([big, small]) => (
+          {[["1,864", "Curves on the Mae Hong Son Loop"], ["FREE", "Accessories shipping across Thailand"], ["RM 20", "Malaysia quantity-block shipping"]].map(([big, small]) => (
             <div key={big}><p className="font-display text-5xl font-bold">{big}</p><p className="mt-1 text-primary-foreground/80">{small}</p></div>
           ))}
         </div>
