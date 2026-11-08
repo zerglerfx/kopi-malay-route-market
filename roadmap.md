@@ -1,10 +1,11 @@
 # Catalog update
-- [ ] Replace ten accessory listings/photos and verify exact dual prices.
-- [ ] Apply 20-unit accessory blocks and weight-based Thai tumbler shipping with configurable unit weights.
-- [ ] Verify updated catalog and checkout across destinations.
+- [x] Replace ten accessory listings/photos and verify exact dual prices.
+- [x] Apply 20-unit accessory blocks and weight-based Thai tumbler shipping with configurable unit weights.
+- [x] Verify updated catalog and checkout across destinations (ten listings, Malaysia totals, Thai free accessories, and quote-required tumblers; 12 shipping/cart tests passed).
+- [ ] Enable Thai tumbler payments: awaiting unit weights and the shipping rate for orders of 1kg or more.
 - [x] Replace tumbler, sticker and magnet placeholders with uploaded products and exact dual prices.
 - [x] Merge apparel categories, add accessory categories, and apply S–5XL sizes.
-- [x] Apply Thailand free shipping and Malaysia quantity-block shipping throughout checkout and receipts.
+- [x] Apply destination shipping throughout checkout and receipts; Thai tumbler and 20-unit accessory rules supersede the original rates.
 - [x] Verify catalog photos, sizes, prices and shipping calculations (Stripe handoff verified; no payment submitted).
 - [ ] Publish anniversary jersey listing: awaiting its MYR/THB prices from the user; both photos are uploaded.
-- [ ] Enable Thai checkout for remaining old apparel/accessories: awaiting THB prices; no exchange rate invented.
+- [ ] Enable Thai checkout for remaining old apparel: awaiting THB prices; no exchange rate invented.
