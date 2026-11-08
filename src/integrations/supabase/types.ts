@@ -123,10 +123,12 @@ export type Database = {
           access_token: string | null
           created_at: string
           currency: string
+          discount_amount: number
           guest_email: string | null
           id: string
           order_number: string
           payment_method: string
+          promo_code: string | null
           receipt_path: string | null
           shipping_address: Json
           shipping_fee: number
@@ -141,10 +143,12 @@ export type Database = {
           access_token?: string | null
           created_at?: string
           currency?: string
+          discount_amount?: number
           guest_email?: string | null
           id?: string
           order_number: string
           payment_method?: string
+          promo_code?: string | null
           receipt_path?: string | null
           shipping_address?: Json
           shipping_fee: number
@@ -159,10 +163,12 @@ export type Database = {
           access_token?: string | null
           created_at?: string
           currency?: string
+          discount_amount?: number
           guest_email?: string | null
           id?: string
           order_number?: string
           payment_method?: string
+          promo_code?: string | null
           receipt_path?: string | null
           shipping_address?: Json
           shipping_fee?: number
@@ -237,15 +243,63 @@ export type Database = {
           },
         ]
       }
+      promo_codes: {
+        Row: {
+          code: string
+          created_at: string
+          current_uses: number
+          discount_myr: number | null
+          discount_thb: number | null
+          discount_type: Database["public"]["Enums"]["promo_discount_type"]
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          min_order_myr: number | null
+          min_order_thb: number | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_uses?: number
+          discount_myr?: number | null
+          discount_thb?: number | null
+          discount_type: Database["public"]["Enums"]["promo_discount_type"]
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          min_order_myr?: number | null
+          min_order_thb?: number | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_uses?: number
+          discount_myr?: number | null
+          discount_thb?: number | null
+          discount_type?: Database["public"]["Enums"]["promo_discount_type"]
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          min_order_myr?: number | null
+          min_order_thb?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      redeem_promo_code: { Args: { _code: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      promo_discount_type: "percentage" | "fixed_amount"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -372,6 +426,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      promo_discount_type: ["percentage", "fixed_amount"],
+    },
   },
 } as const
