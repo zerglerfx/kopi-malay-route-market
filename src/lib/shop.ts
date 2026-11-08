@@ -27,7 +27,7 @@ const IMAGES: Record<string, string> = {
 
 export function imageFor(key: string | undefined): string {
   if (!key) return tee;
-  if (key.startsWith("http")) return key;
+  if (key.startsWith("http") || key.startsWith("/__l5e/assets-v1/")) return key;
   return IMAGES[key] ?? tee;
 }
 
@@ -43,6 +43,7 @@ export type Product = {
   price: number;
   sale_price: number | null;
   price_thb: number | null;
+  weight_kg?: number | null;
   images: string[];
   variants: { sizes?: string[] };
   is_featured: boolean;
@@ -74,16 +75,22 @@ export function isEastMalaysia(state: string): boolean {
 
 export type Country = "Malaysia" | "Thailand";
 export const APPAREL_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
-export type ShippingLine = { category_slug: string; quantity: number };
-export function shippingFee(country: Country, lines: ShippingLine[]): number {
-  if (country === "Thailand") return 0;
+export type ShippingLine = { category_slug: string; quantity: number; weight_kg?: number | null };
+export function shippingFee(country: Country, lines: ShippingLine[]): number | null {
+  if (country === "Thailand") {
+    const tumblers = lines.filter((line) => line.category_slug === "tumblers" && line.quantity > 0);
+    if (!tumblers.length) return 0;
+    if (tumblers.some((line) => line.weight_kg == null || !Number.isFinite(line.weight_kg) || line.weight_kg <= 0)) return null;
+    const weight = tumblers.reduce((sum, line) => sum + (line.weight_kg ?? 0) * line.quantity, 0);
+    return weight < 1 ? 60 : null;
+  }
   let tumblers = 0, apparel = 0, accessories = 0;
   for (const line of lines) {
     if (line.category_slug === "tumblers") tumblers += line.quantity;
     else if (["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(line.category_slug)) apparel += line.quantity;
     else accessories += line.quantity;
   }
-  return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 10));
+  return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 20));
 }
 export function destinationPrice(p: Product, country: Country): number | null {
   return country === "Thailand" ? p.price_thb : effectivePrice(p);
@@ -92,8 +99,9 @@ export function formatMoney(value: number, currency: string): string {
   return `${currency.toLowerCase() === "thb" ? "THB" : "RM"} ${value.toFixed(2)}`;
 }
 export function shippingDescription(category: string): string {
-  const block = category === "tumblers" ? "2 tumblers" : ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category) ? "2 apparel items" : "10 accessories";
-  return `Free shipping to Thailand. Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately.`;
+  const block = category === "tumblers" ? "2 tumblers" : ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category) ? "2 apparel items" : "20 accessories";
+  const thailand = category === "tumblers" ? "Thailand: THB 60.00 for total tumbler weight under 1kg. Checkout is unavailable until unit weights are configured; orders of 1kg or more require a shipping quote." : "Free shipping to Thailand.";
+  return `${thailand} Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately.`;
 }
 
 export function deliveryEstimate(state: string): string {

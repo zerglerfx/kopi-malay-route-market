@@ -46,7 +46,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
     }
 
     const ids = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,variants,categories(slug)").eq("is_active", true).in("id", ids);
+    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,weight_kg,variants,categories(slug)").eq("is_active", true).in("id", ids);
     if (error) throw new Error(error.message);
 
     const lines = data.items.map((i) => {
@@ -56,11 +56,12 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       if (sizes.length && !sizes.includes(i.variant)) throw new Error(`Please choose a size for ${p.name}.`);
       if (data.country === "Thailand" && p.price_thb == null) throw new Error(`Thailand pricing is not available yet for ${p.name}.`);
       const unit = data.country === "Thailand" ? Number(p.price_thb) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
-      return { ...i, name: p.name, unit, category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "" };
+      return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "" };
     });
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
     const ship = shippingFee(data.country, lines);
+    if (ship == null) throw new Error("Thailand tumbler shipping requires configured unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.");
     const currency = data.country === "Thailand" ? "thb" : "myr";
     const orderNumber = `KM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
@@ -93,7 +94,7 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
       shipping_options: [{
         shipping_rate_data: {
           type: "fixed_amount",
-          display_name: data.country === "Thailand" ? "Free Thailand shipping" : "Malaysia quantity-based shipping",
+          display_name: data.country === "Thailand" ? (ship === 0 ? "Free Thailand shipping" : "Thailand tumbler shipping — under 1kg") : "Malaysia quantity-based shipping",
           fixed_amount: { amount: Math.round(ship * 100), currency },
         },
       }],
