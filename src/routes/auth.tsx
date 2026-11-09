@@ -33,6 +33,12 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  // Returning from Google sign-in lands here; send members on to their profile once the session exists.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => { if (data.session) navigate({ to: "/profile", replace: true }); });
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") navigate({ to: "/profile", replace: true }); });
+    return () => sub.subscription.unsubscribe();
+  }, [navigate]);
 
   const google = async () => {
     const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}/auth` });
