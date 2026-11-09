@@ -1,3 +1,4 @@
+import { WishlistButton } from "@/components/wishlist-button";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -65,7 +66,7 @@ function ProductPage() {
       <ProductImageViewer key={p.id} images={p.images} name={p.name} />
       <div>
         <Link to="/shop/$category" params={{ category: p.category_slug }} className="text-xs uppercase tracking-widest text-primary">{p.category_name}</Link>
-        <h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">{p.name}</h1>
+        <div className="mt-2 flex items-start justify-between gap-3"><h1 className="font-display text-3xl font-bold md:text-4xl">{p.name}</h1><WishlistButton productId={p.id} name={p.name} className="shrink-0" /></div>
         <PriceTag p={p} className="mt-3 text-xl" />
         {allSoldOut ? <p className="mt-2 text-sm font-semibold text-sale">Sold out</p>
           : left !== null && left > 0 && left <= 5 ? <p className="mt-2 text-sm font-semibold text-sale">Only {left} left</p>

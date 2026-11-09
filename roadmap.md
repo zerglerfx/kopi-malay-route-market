@@ -1,3 +1,8 @@
+# Major update (Nov 9)
+- [x] Monochrome theme, taller header with logos only, Shop/Services dropdowns, member marquee, New Arrival slider.
+- [x] Google + email sign-in, guest checkout note, wishlist (device + account merge).
+- [x] Towing & Rescue page with map pin and Telegram alert. Map unverified in sandbox; managed map key doesn't work on kopimalay.shop (needs own Google key).
+- [x] Admin dashboard: orders table/search/CSV/QR/tracking, promos, products + Loyverse linking/sync, towing, users/roles.
 # Catalog update
 - [x] Link Black/Official (197), Yellow/Batik (202) and 0KM/South Asia Gate (404); verify all three storefront stock states and magnet add-to-cart, with 24 passing tests. Audit found all ten 8×8cm website stickers unlinked.
 - [x] Link all ten 8×8cm designs to one H001 (A) stock pool; aggregate mixed-design deductions and ignore H001 (C). Mapping/aggregation tests and storefront stock states verified; no live sale/deduction performed.

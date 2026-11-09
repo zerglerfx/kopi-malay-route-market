@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/hooks/use-cart";
+import { WishlistButton } from "@/components/wishlist-button";
 import { effectivePrice, formatRM, imageFor, isApparel, type Product } from "@/lib/shop";
 
 export function PriceTag({ p, className = "" }: { p: Product; className?: string }) {
@@ -28,7 +29,8 @@ export function ProductCard({ p }: { p: Product }) {
   };
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-lg border bg-card">
+    <div className="group relative flex flex-col overflow-hidden rounded-lg border bg-card">
+      <WishlistButton productId={p.id} name={p.name} className="absolute right-2 top-2 z-10" />
       <Link to="/product/$slug" params={{ slug: p.slug }} className="relative block aspect-square overflow-hidden bg-muted">
         <img src={imageFor(p.images[0])} alt={p.name} loading="lazy" width={1024} height={1024} className="size-full object-contain transition-transform duration-500 group-hover:scale-105" />
         {onSale && <span className="absolute left-2 top-2 rounded-sm bg-sale px-2 py-0.5 font-display text-xs font-bold uppercase text-sale-foreground">Sale</span>}

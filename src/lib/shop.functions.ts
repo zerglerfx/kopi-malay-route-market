@@ -19,11 +19,11 @@ function publicClient() {
 }
 
 const SELECT =
-  "id,name,slug,description,price,sale_price,price_thb,weight_kg,images,variants,is_featured,stock_qty,categories(name,slug),product_stock(size,in_stock)";
+  "id,name,slug,description,price,sale_price,price_thb,weight_kg,images,variants,is_featured,is_new_arrival,stock_qty,categories(name,slug),product_stock(size,in_stock)";
 
 type Row = {
   id: string; name: string; slug: string; description: string; price: number; sale_price: number | null;
-  price_thb: number | null; weight_kg: number | null; images: string[]; variants: unknown; is_featured: boolean; stock_qty: number;
+  price_thb: number | null; weight_kg: number | null; images: string[]; variants: unknown; is_featured: boolean; is_new_arrival: boolean; stock_qty: number;
   categories: { name: string; slug: string } | null;
   product_stock: { size: string; in_stock: number }[] | null;
 };
@@ -35,7 +35,7 @@ function toProduct(r: Row): Product {
     price_thb: r.price_thb == null ? null : Number(r.price_thb),
     weight_kg: r.weight_kg == null ? null : Number(r.weight_kg),
     images: r.images ?? [], variants: (r.variants ?? {}) as Product["variants"],
-    is_featured: r.is_featured, stock_qty: r.stock_qty,
+    is_featured: r.is_featured, is_new_arrival: r.is_new_arrival, stock_qty: r.stock_qty,
     stock: r.product_stock?.length ? Object.fromEntries(r.product_stock.map((s) => [s.size, s.in_stock])) : null,
     category_slug: r.categories?.slug ?? "", category_name: r.categories?.name ?? "",
   };

@@ -14,7 +14,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { CartProvider } from "@/hooks/use-cart";
-import { SiteHeader } from "@/components/site-header";
+import { MarqueeBanner, SiteHeader } from "@/components/site-header";
+import { WishlistProvider } from "@/hooks/use-wishlist";
 import { CartDrawer } from "@/components/cart-drawer";
 
 function NotFoundComponent() {
@@ -87,8 +88,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <CartProvider>
+      <WishlistProvider>
         <div className="flex min-h-screen flex-col">
           <SiteHeader />
+          <MarqueeBanner />
           <main className="flex-1"><Outlet /></main>
           <footer className="no-print bg-ink text-ink-foreground">
             <div className="road-stripe" />
@@ -100,6 +103,7 @@ function RootComponent() {
         </div>
         <CartDrawer />
         <Toaster position="top-center" richColors />
+      </WishlistProvider>
       </CartProvider>
     </QueryClientProvider>
   );

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import hero from "@/assets/header.jpg.asset.json";
+import { NewArrivalCarousel } from "@/components/new-arrival-carousel";
 import { ProductCard } from "@/components/product-card";
 import { categoriesQuery, productsQuery } from "@/lib/queries";
 import { imageFor } from "@/lib/shop";
@@ -28,23 +28,12 @@ export const Route = createFileRoute("/")({
 function Home() {
   const { data: products } = useSuspenseQuery(productsQuery);
   const { data: categories } = useSuspenseQuery(categoriesQuery);
+  const arrivals = products.filter((p) => p.is_new_arrival);
   const featured = products.filter((p) => p.is_featured).slice(0, 8);
 
   return (
     <>
-      <section className="relative isolate overflow-hidden bg-ink text-ink-foreground">
-        <img src={hero.url} alt="Kopi Malay storefront with the TAK ROUTE 1 shield sign at the 0 km checkpoint" width={2048} height={1536} className="absolute inset-0 -z-10 size-full object-cover opacity-60" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-ink via-ink/40 to-transparent" />
-        <div className="mx-auto flex min-h-[70vh] max-w-7xl flex-col justify-end px-4 pb-14 pt-32">
-          <span className="w-fit rounded-sm bg-signal px-2 py-1 font-display text-xs font-bold uppercase text-signal-foreground">Official Route 1 Merch</span>
-          <h1 className="mt-4 max-w-3xl font-display text-5xl font-bold uppercase leading-[0.95] md:text-7xl">Ride far.<br />Stop for kopi.</h1>
-          <p className="mt-4 max-w-xl text-ink-foreground/80">Gear for the 1,864 curves of the Mae Hong Son Loop — and every roadside coffee in between.</p>
-          <div className="mt-6 flex gap-3">
-            <Link to="/shop" className="rounded-md bg-primary px-6 py-3 font-display font-semibold uppercase text-primary-foreground hover:opacity-90">Shop all</Link>
-            <Link to="/shop/$category" params={{ category: "stickers" }} className="rounded-md border border-ink-foreground/40 px-6 py-3 font-display font-semibold uppercase hover:bg-ink-foreground/10">Stickers</Link>
-          </div>
-        </div>
-      </section>
+      <NewArrivalCarousel products={arrivals.length ? arrivals : products.slice(-6)} />
 
       <section className="mx-auto max-w-7xl px-4 py-12">
         <h2 className="font-display text-2xl font-bold uppercase">Shop by category</h2>
