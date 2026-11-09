@@ -116,6 +116,34 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "" };
     });
 
+    // Stock check against live Loyverse levels for tracked items.
+    const { data: stockRows } = await supabaseAdmin.from("product_stock").select("product_id,size,loyverse_variant_id").in("product_id", ids);
+    const sold: { variantId: string; quantity: number }[] = [];
+    for (const l of lines) {
+      const tracked = (stockRows ?? []).filter((r) => r.product_id === l.productId);
+      if (!tracked.length) continue;
+      const row = tracked.find((r) => r.size === l.variant);
+      if (!row) throw new Error(`${l.name}${l.variant ? ` (Size ${l.variant})` : ""} is sold out.`);
+      const existing = sold.find((x) => x.variantId === row.loyverse_variant_id);
+      if (existing) existing.quantity += l.quantity; else sold.push({ variantId: row.loyverse_variant_id, quantity: l.quantity });
+    }
+    const loyverse = sold.length ? await import("./loyverse.server") : null;
+    if (loyverse) {
+      try {
+        const levels = await loyverse.fetchLevels(sold.map((x) => x.variantId));
+        for (const x of sold) {
+          const have = levels.filter((v) => v.variant_id === x.variantId).reduce((s, v) => s + v.in_stock, 0);
+          if (have < x.quantity) {
+            const l = lines.find((ln) => stockRows?.some((r) => r.loyverse_variant_id === x.variantId && r.product_id === ln.productId));
+            throw new Error(`Only ${Math.max(0, have)} left of ${l?.name ?? "an item"}${l?.variant ? ` (Size ${l.variant})` : ""}. Please reduce the quantity.`);
+          }
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith("Only ")) throw e;
+        console.error("Loyverse stock check unavailable", e);
+      }
+    }
+
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
     const weight = parcelWeight(lines);
     const ship = shippingFee(data.country, lines, data.state);
@@ -162,6 +190,11 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     })));
     if (itemsError) throw new Error("Could not save your order items. Please try again.");
     if (userId) await supabaseAdmin.from("cart_items").delete().eq("user_id", userId);
+
+    if (loyverse) {
+      try { await loyverse.pushSale(supabaseAdmin, sold); }
+      catch (e) { console.error(`Loyverse deduction failed for ${order.order_number}`, e); }
+    }
 
     try {
       const { data: signed } = await supabaseAdmin.storage.from("payment-receipts").createSignedUrl(path, 60 * 60 * 24 * 7);

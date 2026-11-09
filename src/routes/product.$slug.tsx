@@ -8,7 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PriceTag } from "@/components/product-card";
 import { useCart } from "@/hooks/use-cart";
 import { productQuery } from "@/lib/queries";
-import { isApparel, shippingDescription } from "@/lib/shop";
+import { availableStock, isApparel, shippingDescription } from "@/lib/shop";
 import { ProductImageViewer } from "@/components/product-image-viewer";
 import { ApparelSizeGuide } from "@/components/apparel-size-guide";
 
@@ -46,10 +46,15 @@ function ProductPage() {
   const [qty, setQty] = useState(1);
   if (!p) return null;
   const apparel = isApparel(p);
-  const ready = !apparel || !!size;
+  const sizeKey = apparel ? size : "";
+  const left = apparel && !size ? null : availableStock(p, sizeKey);
+  const soldOut = left !== null && left <= 0;
+  const allSoldOut = !!p.stock && Object.values(p.stock).every((n) => n <= 0);
+  const ready = (!apparel || !!size) && !soldOut && !allSoldOut;
 
   const doAdd = async (buy: boolean) => {
-    if (!ready) { toast.warning("Please select a size first"); return; }
+    if (!ready) { toast.warning(soldOut ? "This item is sold out" : "Please select a size first"); return; }
+    if (left !== null && qty > left) { toast.warning(`Only ${left} left`); return; }
     await add(p, size, qty);
     if (buy) navigate({ to: "/checkout" });
     else toast.success(`${p.name} added to cart`, { action: { label: "View cart", onClick: () => setOpen(true) } });
@@ -62,12 +67,15 @@ function ProductPage() {
         <Link to="/shop/$category" params={{ category: p.category_slug }} className="text-xs uppercase tracking-widest text-primary">{p.category_name}</Link>
         <h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">{p.name}</h1>
         <PriceTag p={p} className="mt-3 text-xl" />
+        {allSoldOut ? <p className="mt-2 text-sm font-semibold text-sale">Sold out</p>
+          : left !== null && left > 0 && left <= 5 ? <p className="mt-2 text-sm font-semibold text-sale">Only {left} left</p>
+          : left !== null && left > 5 ? <p className="mt-2 text-sm text-muted-foreground">In stock</p> : null}
         {apparel && (
           <div className="mt-6">
             <div className="mb-3 flex items-center justify-between gap-3"><p className="font-display text-sm font-semibold uppercase">Size {size && <span className="text-muted-foreground">— {size}</span>}</p><ApparelSizeGuide /></div>
             <div className="flex flex-wrap gap-2">
               {(p.variants.sizes ?? []).map((s) => (
-                <Button variant="outline" key={s} onClick={() => setSize(s)} className={`min-w-12 px-3 font-medium ${size === s ? "border-ink bg-ink text-ink-foreground" : "bg-card hover:border-ink"}`}>{s}</Button>
+                <Button variant="outline" key={s} disabled={availableStock(p, s) === 0} onClick={() => { setSize(s); setQty(1); }} className={`min-w-12 px-3 font-medium ${size === s ? "border-ink bg-ink text-ink-foreground" : "bg-card hover:border-ink"}`}>{s}</Button>
               ))}
             </div>
           </div>
@@ -77,14 +85,14 @@ function ProductPage() {
           <div className="flex items-center rounded-md border bg-card">
             <button aria-label="Decrease quantity" className="p-3" onClick={() => setQty(Math.max(1, qty - 1))}><Minus className="size-4" /></button>
             <span className="w-8 text-center">{qty}</span>
-            <button aria-label="Increase quantity" className="p-3" onClick={() => setQty(qty + 1)}><Plus className="size-4" /></button>
+            <button aria-label="Increase quantity" className="p-3" onClick={() => setQty(left !== null ? Math.min(left, qty + 1) : qty + 1)}><Plus className="size-4" /></button>
           </div>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button disabled={!ready} onClick={() => doAdd(false)} className="rounded-md bg-ink py-3 font-display font-semibold uppercase text-ink-foreground hover:bg-primary disabled:opacity-40">Add to cart</button>
           <button disabled={!ready} onClick={() => doAdd(true)} className="rounded-md bg-sale py-3 font-display font-semibold uppercase text-sale-foreground hover:opacity-90 disabled:opacity-40">Buy now</button>
         </div>
-        {!ready && <p className="mt-2 text-sm text-muted-foreground">Select a size to continue.</p>}
+        {!ready && <p className="mt-2 text-sm text-muted-foreground">{soldOut || allSoldOut ? "Sold out — check back soon." : "Select a size to continue."}</p>}
         <Accordion type="single" collapsible defaultValue="desc" className="mt-8">
           <AccordionItem value="desc"><AccordionTrigger className="font-display uppercase">Description</AccordionTrigger><AccordionContent>{p.description}</AccordionContent></AccordionItem>
           {apparel && (

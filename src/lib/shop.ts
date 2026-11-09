@@ -60,6 +60,8 @@ export type Product = {
   variants: { sizes?: string[] };
   is_featured: boolean;
   stock_qty: number;
+  /** Live Loyverse stock per size ("" for one-size items); null when not tracked. */
+  stock?: Record<string, number> | null;
   category_slug: string;
   category_name: string;
 };
@@ -86,7 +88,7 @@ export function isEastMalaysia(state: string): boolean {
 }
 
 export type Country = "Malaysia" | "Thailand";
-export const APPAREL_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
+export const APPAREL_SIZES = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
 export type ShippingLine = { category_slug: string; quantity: number; weight_kg?: number | null };
 /** Sum in integer grams to avoid floating-point threshold drift. Unknown weights stay explicit. */
 export function parcelWeight(lines: ShippingLine[]): { kg: number; complete: boolean } {
@@ -162,4 +164,10 @@ export function mergeCartLines<T extends CartLine>(account: T[], guest: T[]): T[
     else out.push({ ...g });
   }
   return out;
+}
+
+/** Units available for a product/size, or null when stock is not tracked (unlimited). */
+export function availableStock(p: Pick<Product, "stock">, size: string): number | null {
+  if (!p.stock) return null;
+  return p.stock[size] ?? 0;
 }

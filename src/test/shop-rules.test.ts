@@ -74,7 +74,7 @@ describe("shipping", () => {
   });
 });
 
-it("offers XS through 5XL for apparel", () => expect(APPAREL_SIZES).toEqual(["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]));
+it("offers S through 5XL for apparel (no XS)", () => expect(APPAREL_SIZES).toEqual(["S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]));
 it("formats Thai prices without currency conversion", () => expect(formatMoney(259, "thb")).toBe("THB 259.00"));
 
 describe("currency", () => {
@@ -96,4 +96,11 @@ describe("cart merge on login", () => {
     const merged = mergeCartLines([{ productId: "a", variant: "M", quantity: 1 }], [{ productId: "a", variant: "L", quantity: 1 }]);
     expect(merged).toHaveLength(2);
   });
+});
+
+import { availableStock } from "@/lib/shop";
+it("treats untracked products as unlimited and missing sizes as sold out", () => {
+  expect(availableStock({ stock: null }, "M")).toBeNull();
+  expect(availableStock({ stock: { M: 3 } }, "M")).toBe(3);
+  expect(availableStock({ stock: { M: 3 } }, "L")).toBe(0);
 });

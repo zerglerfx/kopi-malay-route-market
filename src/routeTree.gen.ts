@@ -16,6 +16,7 @@ import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
 import { Route as ShopCategoryRouteImport } from './routes/shop.$category'
+import { Route as ApiPublicLoyverseWebhookRouteImport } from './routes/api/public/loyverse-webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -52,6 +53,12 @@ const ShopCategoryRoute = ShopCategoryRouteImport.update({
   path: '/shop/$category',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicLoyverseWebhookRoute =
+  ApiPublicLoyverseWebhookRouteImport.update({
+    id: '/api/public/loyverse-webhook',
+    path: '/api/public/loyverse-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -61,6 +68,7 @@ export interface FileRoutesByFullPath {
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/shop/': typeof ShopIndexRoute
+  '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +78,7 @@ export interface FileRoutesByTo {
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout': typeof CheckoutIndexRoute
   '/shop': typeof ShopIndexRoute
+  '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +89,7 @@ export interface FileRoutesById {
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/shop/': typeof ShopIndexRoute
+  '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +101,7 @@ export interface FileRouteTypes {
     | '/shop/$category'
     | '/checkout/'
     | '/shop/'
+    | '/api/public/loyverse-webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +111,7 @@ export interface FileRouteTypes {
     | '/shop/$category'
     | '/checkout'
     | '/shop'
+    | '/api/public/loyverse-webhook'
   id:
     | '__root__'
     | '/'
@@ -109,6 +121,7 @@ export interface FileRouteTypes {
     | '/shop/$category'
     | '/checkout/'
     | '/shop/'
+    | '/api/public/loyverse-webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +132,7 @@ export interface RootRouteChildren {
   ShopCategoryRoute: typeof ShopCategoryRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   ShopIndexRoute: typeof ShopIndexRoute
+  ApiPublicLoyverseWebhookRoute: typeof ApiPublicLoyverseWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -172,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopCategoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/loyverse-webhook': {
+      id: '/api/public/loyverse-webhook'
+      path: '/api/public/loyverse-webhook'
+      fullPath: '/api/public/loyverse-webhook'
+      preLoaderRoute: typeof ApiPublicLoyverseWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -183,6 +204,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShopCategoryRoute: ShopCategoryRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   ShopIndexRoute: ShopIndexRoute,
+  ApiPublicLoyverseWebhookRoute: ApiPublicLoyverseWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
