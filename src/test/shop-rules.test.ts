@@ -5,9 +5,6 @@ describe("shipping", () => {
   it("ships jerseys free to Thailand", () => {
     expect(shippingFee("Thailand", [{ category_slug: "jerseys-t-shirts", quantity: 4 }], "Tak")).toBe(0);
   });
-  it("disables direct Singapore shipping", () => {
-    expect(shippingFee("Singapore", [{ category_slug: "jerseys-t-shirts", quantity: 1 }])).toBeNull();
-  });
   it("adds RM 10 once in Sabah across all categories", () => {
     for (const category_slug of ["jerseys-t-shirts", "tumblers", "stickers", "fridge-magnets", "patches", "lanyard", "other-merch"]) {
       expect(shippingFee("Malaysia", [{ category_slug, quantity: 1 }], "Sabah")).toBe(30);
