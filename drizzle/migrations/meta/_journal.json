@@ -85,6 +85,13 @@
       "when": 1794209270958,
       "tag": "0011_scope_public_catalog_reads",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794210138381,
+      "tag": "0012_grant_existing_first_admin",
+      "breakpoints": true
     }
   ]
 }
