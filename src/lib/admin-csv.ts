@@ -20,7 +20,9 @@ export const itemsText = (items: AdminOrderRow["items"]) =>
   items.map((i) => `${i.quantity} × ${i.product_name}${i.selected_variant ? ` (${i.selected_variant})` : ""}`).join("; ");
 
 const cell = (v: unknown) => {
-  const s = String(v ?? "");
+  let s = String(v ?? "");
+  // Neutralize spreadsheet formula injection (=, +, -, @, tab, CR) for text cells.
+  if (typeof v !== "number" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
