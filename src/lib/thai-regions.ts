@@ -6,3 +6,7 @@ export const THAI_REGIONS: { group: string; items: string[] }[] = [
   { group: "Northeast", items: ["Khon Kaen", "Nakhon Ratchasima", "Udon Thani", "Loei"] },
   { group: "Other", items: ["Other / not listed"] },
 ];
+
+export function townsForRegion(region: string): string[] {
+  return THAI_REGIONS.find((r) => r.group === region)?.items ?? [];
+}
