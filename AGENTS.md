@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 - Store data reads go through public server functions in `src/lib/shop.functions.ts`; checkout re-prices from the database server-side so client prices are never trusted.
+- Keep the cart context singleton in a separate browser-safe module from its provider and hook; independently refreshed route consumers must retain the mounted provider's context identity.
 - Payments are manual regional QR: checkout selects the country-specific asset and persists its payment method; `submitManualOrder` stores private receipts, saves `pending_verification`, and sends nonblocking Telegram alerts; `/order-success` requires reference + access token.
 - Checkout details use a shared browser-safe Zod schema for inline feedback and server validation so required fields cannot be bypassed.
 - Product images use keys mapped in `src/lib/shop.ts` to bundled assets or CDN pointer imports; full URLs are also accepted, so uploaded media remains out of the repository.
