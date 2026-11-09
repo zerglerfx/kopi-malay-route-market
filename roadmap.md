@@ -1,4 +1,6 @@
 # Catalog update
+- [x] Link Black/Official (197), Yellow/Batik (202) and 0KM/South Asia Gate (404); verify all three storefront stock states and magnet add-to-cart, with 24 passing tests. Audit found all ten 8×8cm website stickers unlinked.
+- [ ] Link 8×8cm stickers after owner identifies which designs correspond to Loyverse H001 (A) Official Sticker and H001 (C) Official Stickers 2025; remaining designs need distinct POS variants/items before safe stock linking.
 - [x] Set every tumbler to 292g; share parcel weight calculation, checkout display, order storage and Telegram weight reporting. Verified 3/4-unit Thai thresholds and Malaysian charges; no test order or notification sent.
 - [x] Add regional QR display and shared strict checkout validation; verified Malaysia/Thailand images and currencies, required-field focus/errors, receipt checks and mobile layout; 42 tests passed. No order/payment submitted.
 - [x] Add nine uploaded products, retire apparel placeholders, add size guide and image zoom, and verify state-based checkout totals (Sabah/Sarawak RM 105, Peninsular RM 95, Thailand free apparel, Singapore blocked; Stripe RM 105 handoff; no payment submitted).
