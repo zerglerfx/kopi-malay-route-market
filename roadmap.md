@@ -1,11 +1,12 @@
 # Catalog update
-- [ ] Set every tumbler to 292g; share parcel weight calculation, checkout display, order storage and Telegram weight reporting.
+- [x] Set every tumbler to 292g; share parcel weight calculation, checkout display, order storage and Telegram weight reporting. Verified 3/4-unit Thai thresholds and Malaysian charges; no test order or notification sent.
 - [x] Add regional QR display and shared strict checkout validation; verified Malaysia/Thailand images and currencies, required-field focus/errors, receipt checks and mobile layout; 42 tests passed. No order/payment submitted.
 - [x] Add nine uploaded products, retire apparel placeholders, add size guide and image zoom, and verify state-based checkout totals (Sabah/Sarawak RM 105, Peninsular RM 95, Thailand free apparel, Singapore blocked; Stripe RM 105 handoff; no payment submitted).
 - [x] Replace ten accessory listings/photos and verify exact dual prices.
 - [x] Apply 20-unit accessory blocks and weight-based Thai tumbler shipping with configurable unit weights.
 - [x] Verify updated catalog and checkout across destinations (ten listings, Malaysia totals, Thai free accessories, and quote-required tumblers; 12 shipping/cart tests passed).
-- [ ] Enable Thai tumbler payments: awaiting unit weights and the shipping rate for orders of 1kg or more.
+- [x] Enable Thai tumbler payments below 1kg using 292g per unit.
+- [ ] Enable Thai tumbler payments at 1kg or more: awaiting shipping rate from the owner; quote required meanwhile.
 - [x] Replace tumbler, sticker and magnet placeholders with uploaded products and exact dual prices.
 - [x] Merge apparel categories, add accessory categories, and apply S–5XL sizes.
 - [x] Apply destination shipping throughout checkout and receipts; Thai tumbler and 20-unit accessory rules supersede the original rates.
