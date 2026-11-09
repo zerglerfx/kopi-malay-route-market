@@ -12,7 +12,7 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, imageFor, MY_STATES, shippingFee, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
@@ -68,7 +68,9 @@ function Checkout() {
   });
   const unavailable = lines.some((line) => line.price == null);
   const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
-  const ship = shippingFee(country, lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null })), f.state);
+  const shippingLines = lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null }));
+  const weight = parcelWeight(shippingLines);
+  const ship = shippingFee(country, shippingLines, f.state);
   const surcharge = eastMalaysiaSurcharge(country, f.state);
   const checkPromo = useServerFn(validatePromoCode);
   const [promoInput, setPromoInput] = useState("");
@@ -224,13 +226,14 @@ function Checkout() {
               {promoErr && <p role="alert" className="text-sm text-sale">{promoErr}</p>}
             </div>
             <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
+            <div className="flex justify-between gap-3"><dt>{weight.complete ? "Parcel weight" : "Known parcel weight"}</dt><dd className="text-right">{formatParcelWeight(weight)}</dd></div>
             {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
             {surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
           </dl>
           {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
-          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
+          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler orders of 1kg or more require a shipping quote. Please contact Kopi Malay.</p>}
           <Button type="submit" disabled={busy || promoBusy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Submitting…" : "Confirm Order & Submit Receipt"}
           </Button>

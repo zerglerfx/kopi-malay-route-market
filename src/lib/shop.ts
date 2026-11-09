@@ -88,6 +88,23 @@ export function isEastMalaysia(state: string): boolean {
 export type Country = "Malaysia" | "Thailand";
 export const APPAREL_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
 export type ShippingLine = { category_slug: string; quantity: number; weight_kg?: number | null };
+/** Sum in integer grams to avoid floating-point threshold drift. Unknown weights stay explicit. */
+export function parcelWeight(lines: ShippingLine[]): { kg: number; complete: boolean } {
+  let grams = 0;
+  let complete = true;
+  for (const line of lines) {
+    if (line.quantity <= 0) continue;
+    if (line.weight_kg == null || !Number.isFinite(line.weight_kg) || line.weight_kg <= 0) {
+      complete = false;
+      continue;
+    }
+    grams += Math.round(line.weight_kg * 1000) * line.quantity;
+  }
+  return { kg: grams / 1000, complete };
+}
+export function formatParcelWeight(weight: { kg: number; complete: boolean }): string {
+  return `${weight.kg.toFixed(3)} kg${weight.complete ? "" : " (known items only)"}`;
+}
 export function eastMalaysiaSurcharge(country: Country, state: string): number {
   return country === "Malaysia" && ["Sabah", "Sarawak"].includes(state) ? 10 : 0;
 }
@@ -95,9 +112,8 @@ export function shippingFee(country: Country, lines: ShippingLine[], state = "")
   if (country === "Thailand") {
     const tumblers = lines.filter((line) => line.category_slug === "tumblers" && line.quantity > 0);
     if (!tumblers.length) return 0;
-    if (tumblers.some((line) => line.weight_kg == null || !Number.isFinite(line.weight_kg) || line.weight_kg <= 0)) return null;
-    const weight = tumblers.reduce((sum, line) => sum + (line.weight_kg ?? 0) * line.quantity, 0);
-    return weight < 1 ? 60 : null;
+    const weight = parcelWeight(tumblers);
+    return weight.complete && weight.kg < 1 ? 60 : null;
   }
   let tumblers = 0, apparel = 0, accessories = 0;
   for (const line of lines) {
@@ -116,7 +132,7 @@ export function formatMoney(value: number, currency: string): string {
 export function shippingDescription(category: string): string {
   const block = category === "tumblers" ? "2 tumblers" : ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category) ? "2 apparel items" : "20 accessories";
   const apparel = ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category);
-  const thailand = category === "tumblers" ? "Thailand: THB 60.00 for total tumbler weight under 1kg. Checkout is unavailable until unit weights are configured; orders of 1kg or more require a shipping quote." : "Free shipping to Thailand.";
+  const thailand = category === "tumblers" ? "Each tumbler weighs 292g. Thailand: THB 60.00 for total tumbler weight under 1kg; orders of 1kg or more require a shipping quote." : "Free shipping to Thailand.";
   return `${thailand} Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately. Sabah & Sarawak: an additional flat RM 10.00 per order.${apparel ? " Shipped from Tak, Thailand across the border via Peninsular Malaysia." : ""}`;
 }
 

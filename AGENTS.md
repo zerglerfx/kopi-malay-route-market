@@ -15,6 +15,7 @@
 - Product images use keys mapped in `src/lib/shop.ts` to bundled assets or CDN pointer imports; full URLs are also accepted, so uploaded media remains out of the repository.
 - Destination pricing and shipping share browser-safe helpers: checkout rehydrates cart products from the catalog and the server independently computes the same totals; orders persist currency to keep historical receipts accurate.
 - Shipping helpers return null when a destination's rate cannot be determined; both checkout surfaces block payment rather than assume weights or unconfigured rates. Unit weights are read from product records, never from client checkout input.
+- Accumulate catalog unit weights through the shared integer-gram parcel helper on browser and server; save weight and completeness at order placement so missing weights and historical totals remain explicit. Category-specific fixed unit weights are enforced on catalog writes by a database trigger.
 - Pass the validated delivery state to the shared shipping helper on browser and server; region surcharges are applied once to the order, not per shipping group.
 - Product details share a dialog-based image viewer using react-zoom-pan-pinch; apparel size charts use the uploaded asset rather than reconstructed measurements.
 - Retire replaced catalog placeholders with `is_active=false`, excluding them from reads and checkout while retaining historical order references.
