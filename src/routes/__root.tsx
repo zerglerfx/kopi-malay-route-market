@@ -93,13 +93,7 @@ function RootComponent() {
           <SiteHeader />
           <MarqueeBanner />
           <main className="flex-1"><Outlet /></main>
-          <footer className="no-print bg-ink text-ink-foreground">
-            <div className="road-stripe" />
-            <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-sm text-ink-foreground/70 md:flex-row md:justify-between">
-              <p className="font-display font-semibold text-ink-foreground">KOPI MALAY × ROUTE 1</p>
-              <p>© {new Date().getFullYear()} Kopi Malay. Ride safe, drink good kopi.</p>
-            </div>
-          </footer>
+          <SiteFooter />
         </div>
         <CartDrawer />
         <Toaster position="top-center" richColors />
