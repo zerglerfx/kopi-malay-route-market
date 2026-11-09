@@ -8,15 +8,15 @@ type Ctx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: 
 
 /** Verify the caller is an admin (as the user, via RLS-safe function), then hand back the service client. */
 async function adminClient(context: Ctx) {
+  if (!context?.supabase?.rpc || !context.userId) throw new Error("Please sign in again to use the admin dashboard");
   const { data } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
   if (!data) throw new Error("Forbidden: admin access required");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return supabaseAdmin;
 }
 
-const adminFn = (method: "GET" | "POST" = "POST") => createServerFn({ method }).middleware([requireSupabaseAuth]);
 
-export const checkAdmin = adminFn("GET").handler(async ({ context }) => {
+export const checkAdmin = createServerFn({ method: "GET" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   await adminClient(context as unknown as Ctx);
   return true;
 });
@@ -24,7 +24,7 @@ export const checkAdmin = adminFn("GET").handler(async ({ context }) => {
 // ---------- Orders ----------
 export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; promo_code: string | null };
 
-export const listOrders = adminFn().handler(async ({ context }): Promise<AdminOrder[]> => {
+export const listOrders = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }): Promise<AdminOrder[]> => {
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.from("orders")
     .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,promo_code,payment_method,tracking_number,guest_email,shipping_address,receipt_path,order_items(product_name,selected_variant,quantity)")
@@ -42,7 +42,7 @@ export const listOrders = adminFn().handler(async ({ context }): Promise<AdminOr
   }));
 });
 
-export const updateOrder = adminFn()
+export const updateOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     id: z.string().uuid(),
     status: z.enum(["pending", "paid", "pending_verification", "verified", "rejected", "shipped", "completed"]).optional(),
@@ -73,14 +73,14 @@ const PromoSchema = z.object({
   expires_at: z.string().nullable(),
 });
 
-export const listPromos = adminFn().handler(async ({ context }) => {
+export const listPromos = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.from("promo_codes").select("*").order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return data ?? [];
 });
 
-export const savePromo = adminFn().inputValidator((d: unknown) => PromoSchema.parse(d)).handler(async ({ data, context }) => {
+export const savePromo = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: unknown) => PromoSchema.parse(d)).handler(async ({ data, context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const { id, ...row } = data;
   const res = id ? await admin.from("promo_codes").update(row).eq("id", id) : await admin.from("promo_codes").insert(row);
@@ -106,7 +106,7 @@ const ProductSchema = z.object({
   is_active: z.boolean(),
 });
 
-export const listAdminProducts = adminFn().handler(async ({ context }) => {
+export const listAdminProducts = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const [p, c, s, l] = await Promise.all([
     admin.from("products").select("id,name,slug,description,category_id,price,sale_price,price_thb,weight_kg,images,variants,is_featured,is_new_arrival,is_active").order("created_at"),
@@ -123,7 +123,7 @@ export const listAdminProducts = adminFn().handler(async ({ context }) => {
   };
 });
 
-export const saveProduct = adminFn().inputValidator((d: unknown) => ProductSchema.parse(d)).handler(async ({ data, context }) => {
+export const saveProduct = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).inputValidator((d: unknown) => ProductSchema.parse(d)).handler(async ({ data, context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const { id, sizes, ...rest } = data;
   const row = { ...rest, variants: sizes.length ? { sizes } : {} };
@@ -133,13 +133,13 @@ export const saveProduct = adminFn().inputValidator((d: unknown) => ProductSchem
 });
 
 // ---------- Loyverse ----------
-export const syncLoyverseStock = adminFn().handler(async ({ context }) => {
+export const syncLoyverseStock = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const { pullStock } = await import("./loyverse.server");
   return { variants: await pullStock(admin) };
 });
 
-export const listLoyverseVariants = adminFn().handler(async ({ context }) => {
+export const listLoyverseVariants = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   await adminClient(context as unknown as Ctx);
   const token = process.env["LOYVERSE_API_TOKEN"];
   if (!token) throw new Error("Loyverse not configured");
@@ -161,7 +161,7 @@ export const listLoyverseVariants = adminFn().handler(async ({ context }) => {
   return out.sort((a, b) => a.label.localeCompare(b.label));
 });
 
-export const linkStock = adminFn()
+export const linkStock = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ product_id: z.string().uuid(), size: z.string().max(20), loyverse_variant_id: z.string().min(1).max(64).nullable() }).parse(d))
   .handler(async ({ data, context }) => {
     const admin = await adminClient(context as unknown as Ctx);
@@ -176,14 +176,14 @@ export const linkStock = adminFn()
   });
 
 // ---------- Towing ----------
-export const listTowing = adminFn().handler(async ({ context }) => {
+export const listTowing = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.from("towing_requests").select("*").order("created_at", { ascending: false }).limit(500);
   if (error) throw new Error(error.message);
   return data ?? [];
 });
 
-export const updateTowing = adminFn()
+export const updateTowing = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), status: z.enum(TOWING_STATUSES) }).parse(d))
   .handler(async ({ data, context }) => {
     const admin = await adminClient(context as unknown as Ctx);
@@ -193,24 +193,27 @@ export const updateTowing = adminFn()
   });
 
 // ---------- Users ----------
-export const listUsers = adminFn().handler(async ({ context }) => {
+export const listUsers = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw new Error(error.message);
-  const [roles, orders] = await Promise.all([
+  const [roles, orders, profiles] = await Promise.all([
     admin.from("user_roles").select("user_id,role").eq("role", "admin"),
     admin.from("orders").select("user_id,guest_email"),
+    admin.from("profiles").select("id,full_name,phone,city,state,country,motorcycle_make,motorcycle_model,motorcycle_plate,preferred_contact"),
   ]);
+  const prof = new Map((profiles.data ?? []).map((p) => [p.id, p]));
   const admins = new Set((roles.data ?? []).map((r) => r.user_id));
   return data.users.map((u) => ({
     id: u.id, email: u.email ?? "", created_at: u.created_at, last_sign_in_at: u.last_sign_in_at ?? null,
     provider: (u.app_metadata?.["provider"] as string | undefined) ?? "email",
     is_admin: admins.has(u.id),
+    profile: prof.get(u.id) ?? null,
     orders: (orders.data ?? []).filter((o) => o.user_id === u.id || (!!u.email && o.guest_email?.toLowerCase() === u.email.toLowerCase())).length,
   }));
 });
 
-export const setAdminRole = adminFn()
+export const setAdminRole = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     const admin = await adminClient(context as unknown as Ctx);

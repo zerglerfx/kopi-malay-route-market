@@ -74,9 +74,15 @@ export function SiteHeader() {
             {ids.length > 0 && <span className="absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-ink-foreground text-[10px] font-bold text-ink">{ids.length}</span>}
           </Link>
           {user ? (
-            <button aria-label="Sign out" title={`Signed in as ${user.email} — click to sign out`} onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/", replace: true }); }} className="flex items-center gap-1 text-sm">
-              <User className="size-5" /><span className="hidden sm:inline">Sign out</span>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger aria-label="Account" title={`Signed in as ${user.email}`} className="flex items-center gap-1 text-sm">
+                <User className="size-5" /><span className="hidden sm:inline">Account</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild><Link to="/profile">My profile</Link></DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/", replace: true }); }}>Sign out</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <Link to="/auth" aria-label="Account" className="flex items-center gap-1 text-sm"><User className="size-5" /><span className="hidden sm:inline">Login</span></Link>
           )}

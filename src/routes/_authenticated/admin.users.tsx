@@ -15,22 +15,27 @@ function UsersAdmin() {
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin", "users"], queryFn: () => fetchAll() });
   if (error) return <p className="text-destructive">{error.message}</p>;
   if (isLoading) return <p className="text-muted-foreground">Loading…</p>;
-  const rows = data.filter((u) => u.email.toLowerCase().includes(q.toLowerCase()));
+  const rows = data.filter((u) => [u.email, u.profile?.full_name, u.profile?.phone].join(" ").toLowerCase().includes(q.toLowerCase()));
   return (
     <div>
       <div className="flex items-center gap-3">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search email…" className="w-full max-w-xs rounded-md border bg-card px-3 py-2" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search email, name or phone…" className="w-full max-w-xs rounded-md border bg-card px-3 py-2" />
         <span className="text-sm text-muted-foreground">{data.length} registered members</span>
       </div>
       <div className="mt-4 overflow-x-auto rounded-md border">
-        <table className="w-full min-w-[700px] text-sm">
+        <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-muted text-left font-display text-xs uppercase">
-            <tr>{["Email", "Sign-in", "Joined", "Last sign-in", "Orders", "Admin"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
+            <tr>{["Email", "Name", "Phone", "Region", "Motorcycle", "Contact", "Sign-in", "Joined", "Last sign-in", "Orders", "Admin"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((u) => (
               <tr key={u.id} className="border-t">
                 <td className="px-3 py-2">{u.email}</td>
+                <td className="px-3 py-2">{u.profile?.full_name || "—"}</td>
+                <td className="px-3 py-2">{u.profile?.phone || "—"}</td>
+                <td className="px-3 py-2 capitalize">{[u.profile?.city, u.profile?.state, u.profile?.country].filter(Boolean).join(", ") || "—"}</td>
+                <td className="px-3 py-2">{[u.profile?.motorcycle_make, u.profile?.motorcycle_model, u.profile?.motorcycle_plate].filter(Boolean).join(" · ") || "—"}</td>
+                <td className="px-3 py-2 capitalize">{u.profile?.preferred_contact || "—"}</td>
                 <td className="px-3 py-2 capitalize">{u.provider}</td>
                 <td className="px-3 py-2">{new Date(u.created_at).toLocaleDateString()}</td>
                 <td className="px-3 py-2">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "—"}</td>

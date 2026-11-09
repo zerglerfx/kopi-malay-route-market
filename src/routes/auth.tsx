@@ -33,12 +33,18 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  // Returning from Google sign-in lands here; send members on to their profile once the session exists.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => { if (data.session) navigate({ to: "/profile", replace: true }); });
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => { if (event === "SIGNED_IN") navigate({ to: "/profile", replace: true }); });
+    return () => sub.subscription.unsubscribe();
+  }, [navigate]);
 
   const google = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: `${window.location.origin}/auth` });
     if (result.error) { toast.error(result.error.message ?? "Google sign-in failed"); return; }
     if (result.redirected) return;
-    navigate({ to: "/shop" });
+    navigate({ to: "/profile" });
   };
 
   const submit = async (e: React.FormEvent): Promise<void> => {
@@ -49,12 +55,12 @@ function AuthPage() {
       setBusy(false);
       if (error) { toast.error(error.message); return; }
       toast.success("Welcome back! Your cart has been synced.");
-      navigate({ to: "/shop" });
+      navigate({ to: "/profile" });
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
       setBusy(false);
       if (error) { toast.error(error.message); return; }
-      if (data.session) { toast.success("Account created!"); navigate({ to: "/shop" }); }
+      if (data.session) { toast.success("Account created!"); navigate({ to: "/profile" }); }
       else toast.success("Check your email to confirm your account.");
     }
   };
