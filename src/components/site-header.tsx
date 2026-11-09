@@ -109,7 +109,7 @@ export function SiteHeader() {
 export function MarqueeBanner() {
   const text = "Register To Be A Member Today To Receive Special Offer!";
   return (
-    <Link to="/auth" search={{ mode: "signup" }} className="no-print block overflow-hidden border-b border-ink-foreground/10 bg-foreground py-2 text-background" aria-label={text}>
+    <Link to="/auth" search={{ mode: "signup" }} className="no-print block overflow-hidden border-b bg-background py-2 text-foreground" aria-label={text}>
       <div className="flex w-max animate-marquee gap-16 whitespace-nowrap font-display text-sm font-semibold uppercase tracking-wider">
         {Array.from({ length: 8 }).map((_, i) => <span key={i} aria-hidden={i > 0}>★ {text}</span>)}
       </div>

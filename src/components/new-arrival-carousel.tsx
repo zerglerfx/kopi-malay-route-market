@@ -24,7 +24,7 @@ export function NewArrivalCarousel({ products }: { products: Product[] }) {
         <div className="flex">
           {products.map((p) => (
             <div key={p.id} className="min-w-0 shrink-0 grow-0 basis-full">
-              <div className="mx-auto grid min-h-[60vh] max-w-7xl items-center gap-6 px-6 py-10 md:grid-cols-2 md:px-16">
+              <div className="mx-auto grid min-h-[520px] max-w-7xl items-center gap-6 px-6 py-10 md:grid-cols-2 md:px-16">
                 <div className="order-2 md:order-1">
                   <span className="inline-block rounded-sm bg-ink-foreground px-2 py-1 font-display text-xs font-bold uppercase text-ink">New arrival</span>
                   <h2 className="mt-4 font-display text-4xl font-bold uppercase leading-[0.95] md:text-6xl">{p.name}</h2>
