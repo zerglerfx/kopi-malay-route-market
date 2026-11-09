@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { towingErrors, type TowingInput } from "@/lib/towing";
 import { submitTowingRequest } from "@/lib/towing.functions";
-import { THAI_REGIONS } from "@/lib/thai-regions";
+import { THAI_REGIONS, townsForRegion } from "@/lib/thai-regions";
 import { loadMyProfile } from "@/lib/profile";
 
 export const Route = createFileRoute("/towing")({
@@ -54,11 +54,11 @@ function TowingPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const { details, ...rest } = form;
-    const payload = { ...rest, breakdown_location: region ? `${region}${details.trim() ? ` — ${details.trim()}` : ""}` : "", pickup_lat: null, pickup_lng: null };
+    const payload = { ...rest, breakdown_location: region && details ? `${details} (${region})` : "", pickup_lat: null, pickup_lng: null };
     const errs: Record<string, string> = { ...towingErrors(payload) };
-    if (!region) errs["region"] = "Please select your breakdown region.";
     delete errs["breakdown_location"];
-    if (region && payload.breakdown_location.length > 300) errs["details"] = "Location details are too long.";
+    if (!region) errs["region"] = "Please select your breakdown region.";
+    else if (!details) errs["details"] = "Please select your town.";
     setErrors(errs);
     const order = ["name", "phone", "plate_number", "motorcycle_model", "region", "details", "destination"];
     const first = order.find((k) => errs[k]);
@@ -96,19 +96,20 @@ function TowingPage() {
               {err(f.key)}
             </div>
           ))}
-          <div className="space-y-1.5 sm:col-span-2">
+          <div className="space-y-1.5">
             <label htmlFor="tow-region" className="text-sm font-medium">Breakdown region (Thailand) *</label>
-            <select id="tow-region" value={region} onChange={(e) => setRegion(e.target.value)} aria-invalid={!!errors["region"]} className={`${field} ${errors["region"] ? "border-destructive" : ""}`}>
-              <option value="">Select province / area…</option>
-              {THAI_REGIONS.map((g) => (
-                <optgroup key={g.group} label={g.group}>{g.items.map((i) => <option key={i} value={i}>{i}</option>)}</optgroup>
-              ))}
+            <select id="tow-region" value={region} onChange={(e) => { setRegion(e.target.value); setForm({ ...form, details: "" }); }} aria-invalid={!!errors["region"]} className={`${field} ${errors["region"] ? "border-destructive" : ""}`}>
+              <option value="">Select region…</option>
+              {THAI_REGIONS.map((g) => <option key={g.group} value={g.group}>{g.group}</option>)}
             </select>
             {err("region")}
           </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <label htmlFor="tow-details" className="text-sm font-medium">Exact location / distance marker</label>
-            <textarea id="tow-details" rows={2} value={form.details} placeholder="Route 1090, near KM 45 towards Umphang" onChange={(e) => setForm({ ...form, details: e.target.value })} className={`${field} ${errors["details"] ? "border-destructive" : ""}`} />
+          <div className="space-y-1.5">
+            <label htmlFor="tow-details" className="text-sm font-medium">Town *</label>
+            <select id="tow-details" disabled={!region} value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} aria-invalid={!!errors["details"]} className={`${field} disabled:opacity-50 ${errors["details"] ? "border-destructive" : ""}`}>
+              <option value="">{region ? "Select town…" : "Select a region first"}</option>
+              {townsForRegion(region).map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
             {err("details")}
           </div>
           <div className="space-y-1.5 sm:col-span-2">
