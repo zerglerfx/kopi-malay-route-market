@@ -12,7 +12,7 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, imageFor, MY_STATES, shippingFee, SINGAPORE_NOTICE, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, imageFor, MY_STATES, shippingFee, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
@@ -79,7 +79,7 @@ function Checkout() {
   const payable = subtotal - discount + (ship ?? 0);
   const promoItemsKey = items.map((i) => `${i.productId}:${i.quantity}`).join(",");
   const applyPromo = async (code: string) => {
-    if (!code.trim() || country === "Singapore") return;
+    if (!code.trim()) return;
     setPromoBusy(true); setPromoErr(null);
     try {
       const r = await checkPromo({ data: { code: code.trim(), country, items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })) } });
@@ -149,11 +149,10 @@ function Checkout() {
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold uppercase">Shipping address</h2>
             <label htmlFor="checkout-country" className="block text-sm font-medium">Country *</label>
-            <select {...inputProps("country")} aria-label="Country" value={country} onChange={(e) => { const value = e.target.value; setCountry(value === "Thailand" || value === "Singapore" ? value : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }}>
-              <option>Malaysia</option><option>Thailand</option><option>Singapore</option>
+            <select {...inputProps("country")} aria-label="Country" value={country} onChange={(e) => { const value = e.target.value; setCountry(value === "Thailand" ? value : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }}>
+              <option>Malaysia</option><option>Thailand</option>
             </select>
             {errorPrompt("country")}
-            {country === "Singapore" && <p role="alert" className="text-sm text-sale">{SINGAPORE_NOTICE}</p>}
             {lines.some((line) => line.product?.category_slug === "jerseys-t-shirts") && country === "Malaysia" && <p className="text-sm text-muted-foreground">Shipped from Tak, Thailand across the border via Peninsular Malaysia.</p>}
             <div className="space-y-1.5"><label htmlFor="checkout-name" className="text-sm font-medium">Full name *</label>
               <input {...inputProps("name")} autoComplete="name" maxLength={120} placeholder="Full name" value={f.name} onChange={set("name")} />{errorPrompt("name")}</div>
@@ -171,8 +170,7 @@ function Checkout() {
                 <input {...inputProps("postcode")} autoComplete="postal-code" maxLength={5} placeholder="Postcode" inputMode="numeric" value={f.postcode} onChange={set("postcode")} />{errorPrompt("postcode")}</div>
             </div>
           </section>
-          {country !== "Singapore" && (
-            <section className="space-y-4 rounded-lg border bg-card p-5">
+          <section className="space-y-4 rounded-lg border bg-card p-5">
               <h2 className="font-display text-lg font-semibold uppercase">{country === "Thailand" ? "Pay with Thai PromptPay QR" : "Pay with DuitNow / Touch 'n Go QR"}</h2>
               <div className="grid gap-5 sm:grid-cols-[220px_1fr]">
                 <img src={country === "Thailand" ? thaiQrAsset.url : qrAsset.url} alt={country === "Thailand" ? "Kopi Malay Thai PromptPay payment QR code" : "Kopi Malay DuitNow / Touch 'n Go payment QR code"} className="mx-auto w-full max-w-[220px] rounded-md border bg-background" />
@@ -196,8 +194,7 @@ function Checkout() {
                 {receipt && !receiptMsg && <span className="block text-xs">Selected: {receipt.name}</span>}
                 {errorPrompt("receipt")}
               </label>
-            </section>
-          )}
+          </section>
         </div>
         <aside className="h-fit rounded-lg border bg-card p-5">
           <h2 className="font-display text-lg font-semibold uppercase">Order summary</h2>
@@ -221,7 +218,7 @@ function Checkout() {
               ) : (
                 <div className="flex gap-2">
                   <input id="promo" value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void applyPromo(promoInput); } }} placeholder="Enter code" className={field} />
-                  <Button type="button" variant="outline" disabled={promoBusy || !promoInput.trim() || country === "Singapore"} onClick={() => void applyPromo(promoInput)}>{promoBusy ? "…" : "Apply"}</Button>
+                  <Button type="button" variant="outline" disabled={promoBusy || !promoInput.trim()} onClick={() => void applyPromo(promoInput)}>{promoBusy ? "…" : "Apply"}</Button>
                 </div>
               )}
               {promoErr && <p role="alert" className="text-sm text-sale">{promoErr}</p>}
@@ -232,9 +229,9 @@ function Checkout() {
             {surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
           </dl>
-          {unavailable && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
-          {ship == null && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
-          <Button type="submit" disabled={busy || promoBusy || unavailable || ship == null || country === "Singapore"} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
+          {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
+          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
+          <Button type="submit" disabled={busy || promoBusy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Submitting…" : "Confirm Order & Submit Receipt"}
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
