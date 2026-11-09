@@ -22,3 +22,4 @@
 - Product details share a dialog-based image viewer using react-zoom-pan-pinch; apparel size charts use the uploaded asset rather than reconstructed measurements.
 - Retire replaced catalog placeholders with `is_active=false`, excluding them from reads and checkout while retaining historical order references.
 - Promo codes live in a service-role-only `promo_codes` table; `computePromoDiscount` in `src/lib/promo.ts` is shared by preview and `submitManualOrder`, which re-validates and atomically redeems via `redeem_promo_code` so the client discount is never trusted.
+- Stock for Loyverse-linked items lives in `product_stock` (one row per product+size → Loyverse variant); items without rows are untracked/unlimited. Loyverse is the source of truth: the public webhook only triggers a re-read from the Loyverse API (payload never trusted), and `submitManualOrder` checks live levels then deducts via `src/lib/loyverse.server.ts` without blocking the order on sync failure.
