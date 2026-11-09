@@ -8,6 +8,7 @@ type Ctx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: 
 
 /** Verify the caller is an admin (as the user, via RLS-safe function), then hand back the service client. */
 async function adminClient(context: Ctx) {
+  if (!context?.supabase?.rpc || !context.userId) throw new Error("Please sign in again to use the admin dashboard");
   const { data } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
   if (!data) throw new Error("Forbidden: admin access required");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -196,15 +197,18 @@ export const listUsers = createServerFn({ method: "POST" }).middleware([requireS
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw new Error(error.message);
-  const [roles, orders] = await Promise.all([
+  const [roles, orders, profiles] = await Promise.all([
     admin.from("user_roles").select("user_id,role").eq("role", "admin"),
     admin.from("orders").select("user_id,guest_email"),
+    admin.from("profiles").select("id,full_name,phone,city,state,country,motorcycle_make,motorcycle_model,motorcycle_plate,preferred_contact"),
   ]);
+  const prof = new Map((profiles.data ?? []).map((p) => [p.id, p]));
   const admins = new Set((roles.data ?? []).map((r) => r.user_id));
   return data.users.map((u) => ({
     id: u.id, email: u.email ?? "", created_at: u.created_at, last_sign_in_at: u.last_sign_in_at ?? null,
     provider: (u.app_metadata?.["provider"] as string | undefined) ?? "email",
     is_admin: admins.has(u.id),
+    profile: prof.get(u.id) ?? null,
     orders: (orders.data ?? []).filter((o) => o.user_id === u.id || (!!u.email && o.guest_email?.toLowerCase() === u.email.toLowerCase())).length,
   }));
 });
