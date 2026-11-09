@@ -21,13 +21,13 @@ function OrdersAdmin() {
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin", "orders"], queryFn: () => fetchOrders() });
   const [phone, setPhone] = useState("");
   const [qr, setQr] = useState<AdminOrder | null>(null);
-  const [label, setLabel] = useState<AdminOrder | null>(null);
+  const [labelOrder, setLabelOrder] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const saveLabel = useServerFn(setTrackingLabel);
 
   const uploadLabel = async (o: AdminOrder, file: File | null) => {
-    if (file && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) return toast.error("Please choose a PNG, JPG or WEBP image");
-    if (file && file.size > 5 * 1024 * 1024) return toast.error("Image must be 5MB or smaller");
+    if (file && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("Please choose a PNG, JPG or WEBP image"); return; }
+    if (file && file.size > 5 * 1024 * 1024) { toast.error("Image must be 5MB or smaller"); return; }
     setBusy(o.id);
     try {
       const dataUrl = file ? await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); }) : null;
@@ -90,7 +90,7 @@ function OrdersAdmin() {
                   <td className="max-w-[260px] px-3 py-2">{itemsText(o.items)}</td>
                   <td className="w-[300px] px-3 py-2">
                     {o.label_url ? (
-                      <button onClick={() => setLabel(o)} aria-label="Open courier label" className="block w-full overflow-hidden rounded-md border bg-background">
+                      <button onClick={() => setLabelOrder(o)} aria-label="Open courier label" className="block w-full overflow-hidden rounded-md border bg-background">
                         <img src={o.label_url} alt={`Courier label for ${o.order_number}`} className="mx-auto max-h-56 w-full object-contain" />
                       </button>
                     ) : (
@@ -129,10 +129,10 @@ function OrdersAdmin() {
           {qr && <div className="grid place-items-center gap-2 bg-background p-4"><QRCodeSVG value={`${qr.order_number}${qr.tracking_number ? ` | ${qr.tracking_number}` : ""}`} size={200} /><p className="text-sm">{qr.tracking_number ?? "No tracking number yet"}</p></div>}
         </DialogContent>
       </Dialog>
-      <Dialog open={!!label} onOpenChange={(v) => !v && setLabel(null)}>
+      <Dialog open={!!labelOrder} onOpenChange={(v) => !v && setLabelOrder(null)}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{label?.order_number} · {label?.tracking_number ?? "Courier label"}</DialogTitle></DialogHeader>
-          {label?.label_url && <div className="bg-background p-2"><img src={label.label_url} alt={`Courier label for ${label.order_number}`} className="max-h-[75vh] w-full object-contain" /><a href={label.label_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm underline">Open full size</a></div>}
+          <DialogHeader><DialogTitle>{labelOrder?.order_number} · {labelOrder?.tracking_number ?? "Courier label"}</DialogTitle></DialogHeader>
+          {labelOrder?.label_url && <div className="bg-background p-2"><img src={labelOrder.label_url} alt={`Courier label for ${labelOrder.order_number}`} className="max-h-[75vh] w-full object-contain" /><a href={labelOrder.label_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm underline">Open full size</a></div>}
         </DialogContent>
       </Dialog>
     </div>
