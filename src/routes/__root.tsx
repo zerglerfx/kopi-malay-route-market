@@ -1,3 +1,4 @@
+import { SiteFooter } from "@/components/site-footer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
