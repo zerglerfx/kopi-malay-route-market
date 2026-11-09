@@ -59,6 +59,7 @@ export type Product = {
   images: string[];
   variants: { sizes?: string[] };
   is_featured: boolean;
+  is_new_arrival?: boolean;
   stock_qty: number;
   /** Live Loyverse stock per size ("" for one-size items); null when not tracked. */
   stock?: Record<string, number> | null;
