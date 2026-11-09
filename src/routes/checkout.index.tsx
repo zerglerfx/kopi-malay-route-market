@@ -230,7 +230,7 @@ function Checkout() {
               {promoErr && <p role="alert" className="text-sm text-sale">{promoErr}</p>}
             </div>
             <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
-            {bundle.groups > 0 && <div className="flex justify-between gap-3 text-primary"><dt>Sticker bundles ({bundle.groups} × 3 for THB 140)</dt><dd className="shrink-0">- {money(bundle.discount)}</dd></div>}
+            {bundle.groups > 0 && <div className="flex justify-between gap-3 text-primary"><dt>3x Sticker Bundle Discount Applied ({bundle.groups} × 3 for {money(bundle.bundle)})</dt><dd className="shrink-0">- {money(bundle.discount)}</dd></div>}
             <div className="flex justify-between gap-3"><dt>{weight.complete ? "Parcel weight" : "Known parcel weight"}</dt><dd className="text-right">{formatParcelWeight(weight)}</dd></div>
             {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
