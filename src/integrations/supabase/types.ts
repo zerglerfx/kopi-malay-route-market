@@ -525,6 +525,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      designated_google_admin_matches: {
+        Args: {
+          _confirmed_at: string
+          _email: string
+          _email_verified: boolean
+          _identity_email: string
+          _provider: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

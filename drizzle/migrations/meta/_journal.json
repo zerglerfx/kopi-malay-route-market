@@ -99,6 +99,13 @@
       "when": 1794211896017,
       "tag": "0013_create_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794213097306,
+      "tag": "0014_grant_designated_google_admin_on_login",
+      "breakpoints": true
     }
   ]
 }
