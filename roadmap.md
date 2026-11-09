@@ -1,4 +1,5 @@
 # Catalog update
+- [ ] Link confirmed Black/Official and Yellow/Batik lanyards and 0KM/South Asia Gate magnet; audit unmatched 8×8cm paper stickers.
 - [x] Set every tumbler to 292g; share parcel weight calculation, checkout display, order storage and Telegram weight reporting. Verified 3/4-unit Thai thresholds and Malaysian charges; no test order or notification sent.
 - [x] Add regional QR display and shared strict checkout validation; verified Malaysia/Thailand images and currencies, required-field focus/errors, receipt checks and mobile layout; 42 tests passed. No order/payment submitted.
 - [x] Add nine uploaded products, retire apparel placeholders, add size guide and image zoom, and verify state-based checkout totals (Sabah/Sarawak RM 105, Peninsular RM 95, Thailand free apparel, Singapore blocked; Stripe RM 105 handoff; no payment submitted).
