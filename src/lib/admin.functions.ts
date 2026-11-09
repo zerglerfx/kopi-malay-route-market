@@ -22,15 +22,15 @@ export const checkAdmin = createServerFn({ method: "GET" }).middleware([requireS
 });
 
 // ---------- Orders ----------
-export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; promo_code: string | null };
+export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; promo_code: string | null };
 
 export const listOrders = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }): Promise<AdminOrder[]> => {
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.from("orders")
-    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,promo_code,payment_method,tracking_number,guest_email,shipping_address,receipt_path,order_items(product_name,selected_variant,quantity)")
+    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,order_items(product_name,selected_variant,quantity)")
     .order("created_at", { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
-  const paths = (data ?? []).map((o) => o.receipt_path).filter((p): p is string => !!p);
+  const paths = (data ?? []).flatMap((o) => [o.receipt_path, o.tracking_label_path]).filter((p): p is string => !!p);
   const signed = paths.length ? (await admin.storage.from("payment-receipts").createSignedUrls(paths, 3600)).data ?? [] : [];
   return (data ?? []).map((o) => ({
     id: o.id, order_number: o.order_number, created_at: o.created_at, status: o.status, currency: o.currency,
@@ -39,8 +39,38 @@ export const listOrders = createServerFn({ method: "POST" }).middleware([require
     address: (o.shipping_address ?? {}) as AdminOrderRow["address"],
     items: o.order_items ?? [],
     receipt_url: signed.find((s) => s.path === o.receipt_path)?.signedUrl ?? null,
+    label_url: o.tracking_label_path ? signed.find((s) => s.path === o.tracking_label_path)?.signedUrl ?? null : null,
   }));
 });
+
+const LABEL_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const;
+
+/** Upload (or clear) the courier label image (e.g. J&T QR / barcode slip) for an order. */
+export const setTrackingLabel = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    id: z.string().uuid(),
+    dataUrl: z.string().max(7_500_000).nullable(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const admin = await adminClient(context as unknown as Ctx);
+    const { data: order, error: e1 } = await admin.from("orders").select("tracking_label_path").eq("id", data.id).single();
+    if (e1) throw new Error(e1.message);
+    let path: string | null = null;
+    if (data.dataUrl) {
+      const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(data.dataUrl);
+      if (!m) throw new Error("Label must be a PNG, JPG or WEBP image");
+      const type = m[1] as keyof typeof LABEL_TYPES;
+      const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+      if (bytes.byteLength > 5 * 1024 * 1024) throw new Error("Label image must be 5MB or smaller");
+      path = `tracking-labels/${data.id}/${Date.now()}.${LABEL_TYPES[type]}`;
+      const { error } = await admin.storage.from("payment-receipts").upload(path, bytes, { contentType: type });
+      if (error) throw new Error(error.message);
+    }
+    const { error } = await admin.from("orders").update({ tracking_label_path: path }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    if (order?.tracking_label_path) await admin.storage.from("payment-receipts").remove([order.tracking_label_path]);
+    return { ok: true };
+  });
 
 export const updateOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
