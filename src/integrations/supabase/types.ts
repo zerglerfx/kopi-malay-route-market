@@ -332,6 +332,36 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_stock_links: {
+        Row: {
+          loyverse_variant_id: string
+          product_id: string
+        }
+        Insert: {
+          loyverse_variant_id: string
+          product_id: string
+        }
+        Update: {
+          loyverse_variant_id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_stock_links_loyverse_variant_id_fkey"
+            columns: ["loyverse_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["loyverse_variant_id"]
+          },
+          {
+            foreignKeyName: "shared_stock_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
