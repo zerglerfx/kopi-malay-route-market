@@ -140,6 +140,7 @@ export type Database = {
           stripe_session_id: string | null
           subtotal: number
           total_amount: number
+          tracking_label_path: string | null
           tracking_number: string | null
           user_id: string | null
         }
@@ -164,6 +165,7 @@ export type Database = {
           stripe_session_id?: string | null
           subtotal: number
           total_amount: number
+          tracking_label_path?: string | null
           tracking_number?: string | null
           user_id?: string | null
         }
@@ -188,6 +190,7 @@ export type Database = {
           stripe_session_id?: string | null
           subtotal?: number
           total_amount?: number
+          tracking_label_path?: string | null
           tracking_number?: string | null
           user_id?: string | null
         }

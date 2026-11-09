@@ -21,7 +21,7 @@ describe("order export", () => {
     expect(csv).toContain("2 × Tumbler");
   });
   it("phone search ignores formatting", () => {
-    expect(digits(order.address.phone).includes(digits("012 345"))).toBe(false);
+    expect(digits(order.address.phone).includes(digits("019 345"))).toBe(false);
     expect(digits(order.address.phone).includes(digits("12-345"))).toBe(true);
   });
 });

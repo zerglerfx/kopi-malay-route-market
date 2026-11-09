@@ -3,9 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Download, QrCode } from "lucide-react";
+import { Download, ImagePlus, QrCode, Trash2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { listOrders, updateOrder, type AdminOrder } from "@/lib/admin.functions";
+import { listOrders, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
 import { digits, fullAddress, itemsText, ordersToCsv } from "@/lib/admin-csv";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -21,6 +21,22 @@ function OrdersAdmin() {
   const { data = [], isLoading, error } = useQuery({ queryKey: ["admin", "orders"], queryFn: () => fetchOrders() });
   const [phone, setPhone] = useState("");
   const [qr, setQr] = useState<AdminOrder | null>(null);
+  const [labelOrder, setLabelOrder] = useState<AdminOrder | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const saveLabel = useServerFn(setTrackingLabel);
+
+  const uploadLabel = async (o: AdminOrder, file: File | null) => {
+    if (file && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("Please choose a PNG, JPG or WEBP image"); return; }
+    if (file && file.size > 5 * 1024 * 1024) { toast.error("Image must be 5MB or smaller"); return; }
+    setBusy(o.id);
+    try {
+      const dataUrl = file ? await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); }) : null;
+      await saveLabel({ data: { id: o.id, dataUrl } });
+      toast.success(file ? "Courier label saved" : "Courier label removed");
+      await qc.invalidateQueries({ queryKey: ["admin", "orders"] });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Upload failed"); }
+    finally { setBusy(null); }
+  };
 
   const rows = useMemo(() => {
     const q = digits(phone);
@@ -53,7 +69,7 @@ function OrdersAdmin() {
         <div className="mt-4 overflow-x-auto rounded-md border">
           <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-muted text-left font-display text-xs uppercase">
-              <tr>{["NO.", "Name", "Address", "Phone Number", "Payment / Receipt", "Items", "Order Ref / Tracking", "Status"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
+              <tr>{["NO.", "Name", "Address", "Phone Number", "Payment / Receipt", "Items", "Courier Label / QR Code", "Status"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
             </thead>
             <tbody>
               {rows.map((o, i) => (
@@ -72,12 +88,26 @@ function OrdersAdmin() {
                     </div>
                   </td>
                   <td className="max-w-[260px] px-3 py-2">{itemsText(o.items)}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2 font-mono text-xs">{o.order_number}<button aria-label="Show QR code" onClick={() => setQr(o)}><QrCode className="size-4" /></button></div>
+                  <td className="w-[300px] px-3 py-2">
+                    {o.label_url ? (
+                      <button onClick={() => setLabelOrder(o)} aria-label="Open courier label" className="block w-full overflow-hidden rounded-md border bg-background">
+                        <img src={o.label_url} alt={`Courier label for ${o.order_number}`} className="mx-auto max-h-56 w-full object-contain" />
+                      </button>
+                    ) : (
+                      <div className="grid h-40 w-full place-items-center rounded-md border border-dashed text-xs text-muted-foreground">No courier label yet</div>
+                    )}
+                    <div className="mt-2 flex gap-2">
+                      <label className={`flex flex-1 cursor-pointer items-center justify-center gap-1 rounded border px-2 py-1 text-xs font-medium hover:bg-muted ${busy === o.id ? "pointer-events-none opacity-50" : ""}`}>
+                        <ImagePlus className="size-3.5" /> {busy === o.id ? "Uploading…" : o.label_url ? "Replace J&T QR" : "Upload J&T QR"}
+                        <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { void uploadLabel(o, e.target.files?.[0] ?? null); e.target.value = ""; }} />
+                      </label>
+                      {o.label_url && <button aria-label="Remove courier label" disabled={busy === o.id} onClick={() => void uploadLabel(o, null)} className="rounded border px-2 py-1 hover:bg-muted"><Trash2 className="size-3.5" /></button>}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 font-mono text-xs">{o.order_number}<button aria-label="Show QR code" onClick={() => setQr(o)}><QrCode className="size-4" /></button></div>
                     <input
                       defaultValue={o.tracking_number ?? ""} placeholder="Tracking no."
                       onBlur={(e) => { const v = e.target.value.trim() || null; if (v !== o.tracking_number) void patch(o.id, { tracking_number: v }); }}
-                      className="mt-1 w-36 rounded border bg-card px-2 py-1 text-xs"
+                      className="mt-1 w-full rounded border bg-card px-2 py-1 text-xs"
                     />
                     <div className="mt-1 text-xs text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</div>
                   </td>
@@ -97,6 +127,12 @@ function OrdersAdmin() {
         <DialogContent className="max-w-xs">
           <DialogHeader><DialogTitle>{qr?.order_number}</DialogTitle></DialogHeader>
           {qr && <div className="grid place-items-center gap-2 bg-background p-4"><QRCodeSVG value={`${qr.order_number}${qr.tracking_number ? ` | ${qr.tracking_number}` : ""}`} size={200} /><p className="text-sm">{qr.tracking_number ?? "No tracking number yet"}</p></div>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!labelOrder} onOpenChange={(v) => !v && setLabelOrder(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>{labelOrder?.order_number} · {labelOrder?.tracking_number ?? "Courier label"}</DialogTitle></DialogHeader>
+          {labelOrder?.label_url && <div className="bg-background p-2"><img src={labelOrder.label_url} alt={`Courier label for ${labelOrder.order_number}`} className="max-h-[75vh] w-full object-contain" /><a href={labelOrder.label_url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm underline">Open full size</a></div>}
         </DialogContent>
       </Dialog>
     </div>
