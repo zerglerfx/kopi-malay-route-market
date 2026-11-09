@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { APPAREL_SIZES, formatMoney, formatRM, mergeCartLines, parcelWeight, shippingFee } from "@/lib/shop";
+import { APPAREL_SIZES, formatMoney, formatRM, mergeCartLines, parcelWeight, shippingFee, thailandTumblerShipping } from "@/lib/shop";
 
 describe("shipping", () => {
   it("accumulates 292g per tumbler and includes other configured item weights", () => {
@@ -11,7 +11,10 @@ describe("shipping", () => {
     const lines = (quantity: number) => [{ category_slug: "tumblers", quantity, weight_kg: 0.292 }];
     expect(shippingFee("Thailand", lines(3))).toBe(60);
     expect(parcelWeight(lines(4)).kg).toBe(1.168);
-    expect(shippingFee("Thailand", lines(4))).toBeNull();
+    expect(shippingFee("Thailand", lines(4))).toBe(120);
+    expect(shippingFee("Thailand", lines(6))).toBe(120);
+    expect(shippingFee("Thailand", lines(7))).toBe(180);
+    expect(shippingFee("Thailand", lines(50))).toBe(900);
     expect(shippingFee("Malaysia", lines(3), "Johor")).toBe(40);
     expect(shippingFee("Malaysia", lines(3), "Sabah")).toBe(50);
     expect(shippingFee("Malaysia", lines(3), "Sarawak")).toBe(50);
@@ -37,10 +40,23 @@ describe("shipping", () => {
   it("charges a flat THB 60 for tumbler weight under 1kg, even mixed with accessories", () => {
     expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 3, weight_kg: 0.3 }, { category_slug: "stickers", quantity: 99 }])).toBe(60);
   });
-  it("requires a quote for unknown tumbler weights or weights of 1kg and above", () => {
+  it("requires a quote only for unknown tumbler weights", () => {
     expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 1 }])).toBeNull();
-    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 2, weight_kg: 0.5 }])).toBeNull();
-    expect(shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 3, weight_kg: 0.5 }])).toBeNull();
+  });
+  it("adds THB 60 only when a subsequent kilogram starts", () => {
+    const fee = (weight_kg: number) => shippingFee("Thailand", [{ category_slug: "tumblers", quantity: 1, weight_kg }]);
+    expect(fee(1)).toBe(60);
+    expect(fee(1.001)).toBe(120);
+    expect(fee(2)).toBe(120);
+    expect(fee(2.001)).toBe(180);
+  });
+  it("uses only tumbler weight for Thai tiers and exposes the same breakdown for checkout and alerts", () => {
+    const lines = [{ category_slug: "tumblers", quantity: 4, weight_kg: 0.292 }, { category_slug: "stickers", quantity: 100, weight_kg: 0.05 }];
+    expect(thailandTumblerShipping(lines)).toEqual({ weight: { kg: 1.168, complete: true }, blocks: 2, base: 60, surcharge: 60, total: 120 });
+    expect(shippingFee("Thailand", lines)).toBe(120);
+    expect(shippingFee("Malaysia", lines, "Johor")).toBe(140);
+    expect(shippingFee("Malaysia", lines, "Sabah")).toBe(150);
+    expect(shippingFee("Malaysia", lines, "Sarawak")).toBe(150);
   });
   it("charges RM 20 for every two tumblers", () => {
     expect([1, 2, 3, 4, 5].map((quantity) => shippingFee("Malaysia", [{ category_slug: "tumblers", quantity }]))).toEqual([20, 20, 40, 40, 60]);

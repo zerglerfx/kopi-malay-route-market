@@ -6,7 +6,7 @@
 - [x] Apply 20-unit accessory blocks and weight-based Thai tumbler shipping with configurable unit weights.
 - [x] Verify updated catalog and checkout across destinations (ten listings, Malaysia totals, Thai free accessories, and quote-required tumblers; 12 shipping/cart tests passed).
 - [x] Enable Thai tumbler payments below 1kg using 292g per unit.
-- [ ] Enable Thai tumbler payments at 1kg or more: awaiting shipping rate from the owner; quote required meanwhile.
+- [x] Apply Thailand tumbler shipping at THB 60 per started kilogram; checkout and Telegram share weight-tier breakdown. Verified four tumblers: 1.168kg, THB 120 shipping; Sabah unchanged at RM 50; 45 tests passed, no order or notification sent.
 - [x] Replace tumbler, sticker and magnet placeholders with uploaded products and exact dual prices.
 - [x] Merge apparel categories, add accessory categories, and apply S–5XL sizes.
 - [x] Apply destination shipping throughout checkout and receipts; Thai tumbler and 20-unit accessory rules supersede the original rates.

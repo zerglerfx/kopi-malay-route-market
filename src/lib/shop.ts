@@ -108,12 +108,19 @@ export function formatParcelWeight(weight: { kg: number; complete: boolean }): s
 export function eastMalaysiaSurcharge(country: Country, state: string): number {
   return country === "Malaysia" && ["Sabah", "Sarawak"].includes(state) ? 10 : 0;
 }
+/** Thailand bills tumbler-only weight in started kilograms; other items remain free. */
+export function thailandTumblerShipping(lines: ShippingLine[]) {
+  const tumblers = lines.filter((line) => line.category_slug === "tumblers" && line.quantity > 0);
+  const weight = parcelWeight(tumblers);
+  if (!weight.complete) return null;
+  const blocks = Math.ceil(Math.round(weight.kg * 1000) / 1000);
+  const base = blocks > 0 ? 60 : 0;
+  const surcharge = Math.max(0, blocks - 1) * 60;
+  return { weight, blocks, base, surcharge, total: base + surcharge };
+}
 export function shippingFee(country: Country, lines: ShippingLine[], state = ""): number | null {
   if (country === "Thailand") {
-    const tumblers = lines.filter((line) => line.category_slug === "tumblers" && line.quantity > 0);
-    if (!tumblers.length) return 0;
-    const weight = parcelWeight(tumblers);
-    return weight.complete && weight.kg < 1 ? 60 : null;
+    return thailandTumblerShipping(lines)?.total ?? null;
   }
   let tumblers = 0, apparel = 0, accessories = 0;
   for (const line of lines) {
@@ -132,7 +139,7 @@ export function formatMoney(value: number, currency: string): string {
 export function shippingDescription(category: string): string {
   const block = category === "tumblers" ? "2 tumblers" : ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category) ? "2 apparel items" : "20 accessories";
   const apparel = ["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(category);
-  const thailand = category === "tumblers" ? "Each tumbler weighs 292g. Thailand: THB 60.00 for total tumbler weight under 1kg; orders of 1kg or more require a shipping quote." : "Free shipping to Thailand.";
+  const thailand = category === "tumblers" ? "Each tumbler weighs 292g. Thailand: THB 60.00 for the first 1kg of tumbler weight, plus THB 60.00 per additional started kilogram." : "Free shipping to Thailand.";
   return `${thailand} Malaysia: RM 20.00 per block of ${block}. Mixed shipping groups are charged separately. Sabah & Sarawak: an additional flat RM 10.00 per order.${apparel ? " Shipped from Tak, Thailand across the border via Peninsular Malaysia." : ""}`;
 }
 

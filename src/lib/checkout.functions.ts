@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { effectivePrice, formatMoney, formatParcelWeight, parcelWeight, shippingFee } from "./shop";
+import { effectivePrice, formatMoney, formatParcelWeight, parcelWeight, shippingFee, thailandTumblerShipping } from "./shop";
 import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
@@ -119,7 +119,8 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
     const weight = parcelWeight(lines);
     const ship = shippingFee(data.country, lines, data.state);
-    if (ship == null) throw new Error("Thailand tumbler shipping requires a quote. Please contact Kopi Malay.");
+    if (ship == null) throw new Error("Tumbler weight is unavailable. Please contact Kopi Malay for shipping.");
+    const thaiShipping = data.country === "Thailand" ? thailandTumblerShipping(lines) : null;
     const currency = data.country === "Thailand" ? "thb" : "myr";
     let promoCode: string | null = null;
     let discount = 0;
@@ -177,6 +178,10 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         ``,
         `📦 <b>Items</b>`,
         `⚖️ Parcel weight: ${formatParcelWeight(weight)}`,
+        ...(thaiShipping && thaiShipping.blocks > 0 ? [
+          `⚖️ Tumbler weight: ${formatParcelWeight(thaiShipping.weight)} · ${thaiShipping.blocks} started 1kg tier(s)`,
+          `🚚 Thailand shipping: Base ${m(thaiShipping.base)} + Excess weight ${m(thaiShipping.surcharge)} = ${m(thaiShipping.total)}`,
+        ] : []),
         ...lines.map((l) => `• ${esc(l.name)}${l.variant ? ` (Size ${esc(l.variant)})` : ""} × ${l.quantity} — ${m(l.unit * l.quantity)}`),
         ``,
         ...(promoCode ? [`🎟️ Promo Code Applied: ${esc(promoCode)} (-${m(discount)})`] : []),
