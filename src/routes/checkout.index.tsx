@@ -7,9 +7,11 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { productsQuery } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { submitManualOrder, validatePromoCode } from "@/lib/checkout.functions";
-import { makeOrderRef, receiptError } from "@/lib/manual-order";
+import { makeOrderRef } from "@/lib/manual-order";
 import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
+import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
+import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
 import { destinationPrice, eastMalaysiaSurcharge, formatMoney, imageFor, MY_STATES, shippingFee, SINGAPORE_NOTICE, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
@@ -40,10 +42,24 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [ref, setRef] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
-  const [receiptMsg, setReceiptMsg] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Partial<Record<CheckoutField, boolean>>>({});
+  const [attempted, setAttempted] = useState(false);
   useEffect(() => { setRef(makeOrderRef()); }, []);
   const [f, setF] = useState({ email: "", name: "", phone: "", address: "", city: "", state: "", postcode: "" });
   const [country, setCountry] = useState<Country>("Malaysia");
+  const errors = checkoutErrors({ ...f, country }, receipt);
+  const visibleError = (key: CheckoutField) => attempted || touched[key] ? errors[key] : undefined;
+  const receiptMsg = visibleError("receipt");
+  const inputProps = (key: CheckoutField) => ({
+    id: `checkout-${key}`,
+    name: key,
+    required: true,
+    "aria-invalid": Boolean(visibleError(key)),
+    "aria-describedby": visibleError(key) ? `checkout-${key}-error` : undefined,
+    onBlur: () => setTouched((prev) => ({ ...prev, [key]: true })),
+    className: `${field} scroll-mt-28 ${visibleError(key) ? "border-destructive ring-1 ring-destructive focus:ring-destructive" : ""}`,
+  });
+  const errorPrompt = (key: CheckoutField) => visibleError(key) ? <p id={`checkout-${key}-error`} role="alert" className="text-sm text-destructive">{visibleError(key)}</p> : null;
   const currency = country === "Thailand" ? "thb" : "myr";
   const money = (value: number) => formatMoney(value, currency);
   const lines = items.map((item) => {
@@ -77,16 +93,24 @@ function Checkout() {
   useEffect(() => { if (cancelled) toast.warning("Payment was cancelled — your cart is still saved."); }, [cancelled]);
   useEffect(() => { const email = user?.email; if (email) setF((p) => (p.email ? p : { ...p, email })); }, [user]);
 
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((prev) => ({ ...prev, [k]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (country === "Singapore") { toast.warning(SINGAPORE_NOTICE); return; }
+    if (busy) return;
+    setAttempted(true);
+    const firstInvalid = (["email", "phone", "country", "name", "address", "city", "state", "postcode", "receipt"] as const).find((key) => errors[key]);
+    if (firstInvalid) {
+      requestAnimationFrame(() => {
+        const element = document.getElementById(`checkout-${firstInvalid}`);
+        element?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
+        element?.focus({ preventScroll: true });
+      });
+      return;
+    }
     if (unavailable) { toast.warning("Some items are unavailable for this destination."); return; }
     if (ship == null) { toast.warning("Please contact Kopi Malay for a Thailand tumbler shipping quote."); return; }
-    if (!f.state) { toast.warning("Please choose your state"); return; }
-    const rErr = receiptError(receipt);
-    if (rErr || !receipt) { setReceiptMsg(rErr); toast.warning(rErr ?? "Please upload your payment proof."); return; }
+    if (!receipt) return;
     setBusy(true);
     try {
       const fd = new FormData();
@@ -112,37 +136,46 @@ function Checkout() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="font-display text-3xl font-bold uppercase md:text-4xl">Checkout</h1>
-      <form onSubmit={submit} className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px]">
+      <form noValidate onSubmit={submit} className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold uppercase">Contact</h2>
-            <input required type="email" placeholder="Email" value={f.email} onChange={set("email")} className={field} />
-            <input required placeholder="Phone (e.g. 012-345 6789)" value={f.phone} onChange={set("phone")} className={field} />
+            <div className="space-y-1.5"><label htmlFor="checkout-email" className="text-sm font-medium">Email address *</label>
+              <input {...inputProps("email")} type="email" autoComplete="email" maxLength={255} placeholder="Email" value={f.email} onChange={set("email")} />{errorPrompt("email")}</div>
+            <div className="space-y-1.5"><label htmlFor="checkout-phone" className="text-sm font-medium">Phone number *</label>
+              <input {...inputProps("phone")} type="tel" autoComplete="tel" maxLength={30} placeholder="Phone (e.g. 012-345 6789)" value={f.phone} onChange={set("phone")} />{errorPrompt("phone")}</div>
             {!user && <p className="text-sm text-muted-foreground">Have an account? <Link to="/auth" className="text-primary underline">Log in</Link> to save your cart.</p>}
           </section>
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold uppercase">Shipping address</h2>
-            <select aria-label="Country" value={country} onChange={(e) => { const value = e.target.value; setCountry(value === "Thailand" || value === "Singapore" ? value : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }} className={field}>
+            <label htmlFor="checkout-country" className="block text-sm font-medium">Country *</label>
+            <select {...inputProps("country")} aria-label="Country" value={country} onChange={(e) => { const value = e.target.value; setCountry(value === "Thailand" || value === "Singapore" ? value : "Malaysia"); setF((prev) => ({ ...prev, state: "" })); }}>
               <option>Malaysia</option><option>Thailand</option><option>Singapore</option>
             </select>
+            {errorPrompt("country")}
             {country === "Singapore" && <p role="alert" className="text-sm text-sale">{SINGAPORE_NOTICE}</p>}
             {lines.some((line) => line.product?.category_slug === "jerseys-t-shirts") && country === "Malaysia" && <p className="text-sm text-muted-foreground">Shipped from Tak, Thailand across the border via Peninsular Malaysia.</p>}
-            <input required placeholder="Full name" value={f.name} onChange={set("name")} className={field} />
-            <input required placeholder="Address" value={f.address} onChange={set("address")} className={field} />
+            <div className="space-y-1.5"><label htmlFor="checkout-name" className="text-sm font-medium">Full name *</label>
+              <input {...inputProps("name")} autoComplete="name" maxLength={120} placeholder="Full name" value={f.name} onChange={set("name")} />{errorPrompt("name")}</div>
+            <div className="space-y-1.5"><label htmlFor="checkout-address" className="text-sm font-medium">Street address *</label>
+              <input {...inputProps("address")} autoComplete="street-address" maxLength={300} placeholder="Address" value={f.address} onChange={set("address")} />{errorPrompt("address")}</div>
             <div className="grid gap-3 sm:grid-cols-3">
-              <input required placeholder="City" value={f.city} onChange={set("city")} className={field} />
-              {country === "Malaysia" ? <select required value={f.state} onChange={set("state")} className={field} aria-label="State">
-                <option value="">State</option>
-                {MY_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select> : <input required aria-label="Province" placeholder="Province" value={f.state} onChange={set("state")} className={field} />}
-              <input required placeholder="Postcode" pattern="\d{5}" inputMode="numeric" value={f.postcode} onChange={set("postcode")} className={field} />
+              <div className="space-y-1.5"><label htmlFor="checkout-city" className="text-sm font-medium">City *</label>
+                <input {...inputProps("city")} autoComplete="address-level2" maxLength={100} placeholder="City" value={f.city} onChange={set("city")} />{errorPrompt("city")}</div>
+              <div className="space-y-1.5"><label htmlFor="checkout-state" className="text-sm font-medium">{country === "Malaysia" ? "State" : "Province / Region"} *</label>
+                {country === "Malaysia" ? <select {...inputProps("state")} autoComplete="address-level1" value={f.state} onChange={set("state")} aria-label="State">
+                  <option value="">State</option>
+                  {MY_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select> : <input {...inputProps("state")} autoComplete="address-level1" maxLength={100} aria-label="Province" placeholder="Province" value={f.state} onChange={set("state")} />}{errorPrompt("state")}</div>
+              <div className="space-y-1.5"><label htmlFor="checkout-postcode" className="text-sm font-medium">Postcode *</label>
+                <input {...inputProps("postcode")} autoComplete="postal-code" maxLength={5} placeholder="Postcode" inputMode="numeric" value={f.postcode} onChange={set("postcode")} />{errorPrompt("postcode")}</div>
             </div>
           </section>
           {country !== "Singapore" && (
             <section className="space-y-4 rounded-lg border bg-card p-5">
-              <h2 className="font-display text-lg font-semibold uppercase">Pay with DuitNow / Touch 'n Go QR</h2>
+              <h2 className="font-display text-lg font-semibold uppercase">{country === "Thailand" ? "Pay with Thai PromptPay QR" : "Pay with DuitNow / Touch 'n Go QR"}</h2>
               <div className="grid gap-5 sm:grid-cols-[220px_1fr]">
-                <img src={qrAsset.url} alt="Kopi Malay DuitNow / Touch 'n Go payment QR code" className="mx-auto w-full max-w-[220px] rounded-md border bg-background" />
+                <img src={country === "Thailand" ? thaiQrAsset.url : qrAsset.url} alt={country === "Thailand" ? "Kopi Malay Thai PromptPay payment QR code" : "Kopi Malay DuitNow / Touch 'n Go payment QR code"} className="mx-auto w-full max-w-[220px] rounded-md border bg-background" />
                 <div className="space-y-3 text-sm">
                   <div className="rounded-md border bg-background p-3">
                     <p className="text-muted-foreground">Amount to pay</p>
@@ -153,16 +186,15 @@ function Checkout() {
                       <button type="button" onClick={() => { void navigator.clipboard?.writeText(ref); toast.success("Reference copied"); }} className="rounded border px-2 py-1 text-xs">Copy</button>
                     </div>
                   </div>
-                  <p><strong>Malaysia:</strong> Scan with Touch 'n Go eWallet or any Malaysian mobile banking app (DuitNow QR).</p>
-                  <p><strong>Thailand / ประเทศไทย:</strong> Scan with any major Thai bank app (SCB, K-Bank, Krungthai) via cross-border PromptPay / DuitNow QR. สแกนผ่านแอปธนาคารไทย (PromptPay ข้ามประเทศ)</p>
+                  {country === "Thailand" ? <p><strong>Thailand / ประเทศไทย:</strong> Scan the Thai PromptPay QR with K-Bank, SCB, Krungthai or another Thai bank app. Enter the exact THB amount shown above. สแกนผ่านแอปธนาคารไทยและชำระตามยอดเงินบาทที่แสดง</p> : <p><strong>Malaysia:</strong> Scan the DuitNow QR with Touch 'n Go eWallet, MAE, CIMB or another Malaysian banking app. Enter the exact MYR amount shown above.</p>}
                 </div>
               </div>
               <label className="block space-y-1.5">
                 <span className="font-medium">Upload payment proof / receipt *</span>
-                <input required type="file" accept="image/png,image/jpeg,application/pdf" onChange={(e) => { const file = e.target.files?.[0] ?? null; setReceipt(file); setReceiptMsg(file ? receiptError(file) : null); }} className={field} />
+                <input {...inputProps("receipt")} type="file" accept="image/png,image/jpeg,application/pdf" onChange={(e) => { setReceipt(e.target.files?.[0] ?? null); setTouched((prev) => ({ ...prev, receipt: true })); }} />
                 <span className="block text-xs text-muted-foreground">PNG, JPG or PDF, up to 5MB.</span>
                 {receipt && !receiptMsg && <span className="block text-xs">Selected: {receipt.name}</span>}
-                {receiptMsg && <span role="alert" className="block text-sm text-sale">{receiptMsg}</span>}
+                {errorPrompt("receipt")}
               </label>
             </section>
           )}
@@ -202,7 +234,7 @@ function Checkout() {
           </dl>
           {unavailable && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
           {ship == null && country !== "Singapore" && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler shipping needs confirmed unit weights and a total under 1kg. Please contact Kopi Malay for a shipping quote.</p>}
-          <Button type="submit" disabled={busy || unavailable || ship == null || country === "Singapore"} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
+          <Button type="submit" disabled={busy || promoBusy || unavailable || ship == null || country === "Singapore"} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Submitting…" : "Confirm Order & Submit Receipt"}
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
