@@ -1,19 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { effectivePrice, formatMoney, MY_STATES, shippingFee } from "./shop";
+import { effectivePrice, formatMoney, shippingFee } from "./shop";
+import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
 
-const CheckoutInput = z.object({
-  email: z.string().trim().email().max(255),
-  name: z.string().trim().min(1).max(120),
-  phone: z.string().trim().min(6).max(30),
-  address: z.string().trim().min(3).max(300),
-  city: z.string().trim().min(1).max(100),
-  country: z.enum(["Malaysia", "Thailand"]),
-  state: z.string().trim().min(1).max(100),
-  postcode: z.string().regex(/^\d{5}$/),
+const CheckoutInput = CheckoutDetails.extend({
   ref: z.string().regex(ORDER_REF_RE).optional(),
   promoCode: z.string().trim().max(40).optional(),
   items: z.array(z.object({
@@ -21,11 +14,7 @@ const CheckoutInput = z.object({
     variant: z.string().max(20),
     quantity: z.number().int().min(1).max(50),
   })).min(1).max(50),
-}).superRefine((data, ctx) => {
-  if (data.country === "Malaysia" && !(MY_STATES as readonly string[]).includes(data.state)) {
-    ctx.addIssue({ code: "custom", path: ["state"], message: "Please choose a Malaysian state." });
-  }
-});
+}).superRefine(validateDeliveryState);
 
 function magicOk(bytes: Uint8Array, type: string): boolean {
   if (type === "image/png") return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
@@ -153,7 +142,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         order_number: ref, user_id: userId, guest_email: data.email, currency,
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
-        status: "pending_verification", payment_method: "DuitNow QR", access_token: token,
+        status: "pending_verification", payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,
       }).select("id, order_number").single();
       if (o) order = o;
       else if (oErr && oErr.code !== "23505") throw new Error("Could not save your order. Please try again.");
