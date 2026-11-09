@@ -21,6 +21,8 @@ import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
 import { Route as ShopCategoryRouteImport } from './routes/shop.$category'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
+import { Route as AuthenticatedAdminProductsRouteImport } from './routes/_authenticated/admin.products'
+import { Route as AuthenticatedAdminPromosRouteImport } from './routes/_authenticated/admin.promos'
 import { Route as AuthenticatedAdminTowingRouteImport } from './routes/_authenticated/admin.towing'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as ApiPublicLoyverseWebhookRouteImport } from './routes/api/public/loyverse-webhook'
@@ -84,6 +86,18 @@ const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminProductsRoute =
+  AuthenticatedAdminProductsRouteImport.update({
+    id: '/products',
+    path: '/products',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminPromosRoute =
+  AuthenticatedAdminPromosRouteImport.update({
+    id: '/promos',
+    path: '/promos',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminTowingRoute =
   AuthenticatedAdminTowingRouteImport.update({
     id: '/towing',
@@ -113,6 +127,8 @@ export interface FileRoutesByFullPath {
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/shop/': typeof ShopIndexRoute
+  '/admin/products': typeof AuthenticatedAdminProductsRoute
+  '/admin/promos': typeof AuthenticatedAdminPromosRoute
   '/admin/towing': typeof AuthenticatedAdminTowingRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
@@ -128,6 +144,8 @@ export interface FileRoutesByTo {
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout': typeof CheckoutIndexRoute
   '/shop': typeof ShopIndexRoute
+  '/admin/products': typeof AuthenticatedAdminProductsRoute
+  '/admin/promos': typeof AuthenticatedAdminPromosRoute
   '/admin/towing': typeof AuthenticatedAdminTowingRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
@@ -146,6 +164,8 @@ export interface FileRoutesById {
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/shop/': typeof ShopIndexRoute
+  '/_authenticated/admin/products': typeof AuthenticatedAdminProductsRoute
+  '/_authenticated/admin/promos': typeof AuthenticatedAdminPromosRoute
   '/_authenticated/admin/towing': typeof AuthenticatedAdminTowingRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/api/public/loyverse-webhook': typeof ApiPublicLoyverseWebhookRoute
@@ -164,6 +184,8 @@ export interface FileRouteTypes {
     | '/shop/$category'
     | '/checkout/'
     | '/shop/'
+    | '/admin/products'
+    | '/admin/promos'
     | '/admin/towing'
     | '/admin/users'
     | '/api/public/loyverse-webhook'
@@ -179,6 +201,8 @@ export interface FileRouteTypes {
     | '/shop/$category'
     | '/checkout'
     | '/shop'
+    | '/admin/products'
+    | '/admin/promos'
     | '/admin/towing'
     | '/admin/users'
     | '/api/public/loyverse-webhook'
@@ -196,6 +220,8 @@ export interface FileRouteTypes {
     | '/shop/$category'
     | '/checkout/'
     | '/shop/'
+    | '/_authenticated/admin/products'
+    | '/_authenticated/admin/promos'
     | '/_authenticated/admin/towing'
     | '/_authenticated/admin/users'
     | '/api/public/loyverse-webhook'
@@ -302,6 +328,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/products': {
+      id: '/_authenticated/admin/products'
+      path: '/products'
+      fullPath: '/admin/products'
+      preLoaderRoute: typeof AuthenticatedAdminProductsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/promos': {
+      id: '/_authenticated/admin/promos'
+      path: '/promos'
+      fullPath: '/admin/promos'
+      preLoaderRoute: typeof AuthenticatedAdminPromosRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/towing': {
       id: '/_authenticated/admin/towing'
       path: '/towing'
@@ -327,12 +367,16 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedAdminRouteChildren {
+  AuthenticatedAdminProductsRoute: typeof AuthenticatedAdminProductsRoute
+  AuthenticatedAdminPromosRoute: typeof AuthenticatedAdminPromosRoute
   AuthenticatedAdminTowingRoute: typeof AuthenticatedAdminTowingRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
 }
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
+  AuthenticatedAdminProductsRoute: AuthenticatedAdminProductsRoute,
+  AuthenticatedAdminPromosRoute: AuthenticatedAdminPromosRoute,
   AuthenticatedAdminTowingRoute: AuthenticatedAdminTowingRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
