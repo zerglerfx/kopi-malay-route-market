@@ -62,6 +62,8 @@ export type Product = {
   stock_qty: number;
   /** Live Loyverse stock per size ("" for one-size items); null when not tracked. */
   stock?: Record<string, number> | null;
+  /** Shared one-size inventory pool, when several designs draw from one POS variant. */
+  stock_pool?: string;
   category_slug: string;
   category_name: string;
 };

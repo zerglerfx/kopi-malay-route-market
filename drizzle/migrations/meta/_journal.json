@@ -50,6 +50,20 @@
       "when": 1794199751015,
       "tag": "0006_loyverse_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794202842384,
+      "tag": "0007_shared_inventory_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794202938170,
+      "tag": "0008_order_sticker_bundle_savings",
+      "breakpoints": true
     }
   ]
 }

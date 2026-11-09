@@ -1,0 +1,2 @@
+ALTER TABLE public.orders ADD COLUMN sticker_bundle_discount numeric NOT NULL DEFAULT 0;
+COMMENT ON COLUMN public.orders.sticker_bundle_discount IS 'Historical THB paper-sticker bundle savings; subtotal stores catalog amount before these savings and promo discount.';

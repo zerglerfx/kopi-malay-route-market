@@ -13,6 +13,7 @@ import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
 import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, thailandTumblerShipping, type Country } from "@/lib/shop";
+import { stickerBundle } from "@/lib/sticker-bundle";
 
 export const Route = createFileRoute("/checkout/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
@@ -68,6 +69,7 @@ function Checkout() {
   });
   const unavailable = lines.some((line) => line.price == null);
   const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
+  const bundle = stickerBundle(lines.map((line) => ({ name: line.product?.name ?? "", category_slug: line.product?.category_slug ?? "", quantity: line.quantity })), country);
   const shippingLines = lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null }));
   const weight = parcelWeight(shippingLines);
   const ship = shippingFee(country, shippingLines, f.state);
@@ -78,8 +80,8 @@ function Checkout() {
   const [promo, setPromo] = useState<{ code: string; discount: number; label: string } | null>(null);
   const [promoErr, setPromoErr] = useState<string | null>(null);
   const [promoBusy, setPromoBusy] = useState(false);
-  const discount = promo ? Math.min(promo.discount, subtotal) : 0;
-  const payable = subtotal - discount + (ship ?? 0);
+  const discount = promo ? Math.min(promo.discount, subtotal - bundle.discount) : 0;
+  const payable = subtotal - bundle.discount - discount + (ship ?? 0);
   const promoItemsKey = items.map((i) => `${i.productId}:${i.quantity}`).join(",");
   const applyPromo = async (code: string) => {
     if (!code.trim()) return;
@@ -227,6 +229,7 @@ function Checkout() {
               {promoErr && <p role="alert" className="text-sm text-sale">{promoErr}</p>}
             </div>
             <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
+            {bundle.groups > 0 && <div className="flex justify-between gap-3 text-primary"><dt>Sticker bundles ({bundle.groups} × 3 for THB 140)</dt><dd className="shrink-0">- {money(bundle.discount)}</dd></div>}
             <div className="flex justify-between gap-3"><dt>{weight.complete ? "Parcel weight" : "Known parcel weight"}</dt><dd className="text-right">{formatParcelWeight(weight)}</dd></div>
             {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>

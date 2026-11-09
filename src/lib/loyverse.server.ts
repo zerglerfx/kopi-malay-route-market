@@ -33,7 +33,7 @@ export async function fetchLevels(variantIds: string[]): Promise<Level[]> {
 /** Pull Loyverse stock into the website for every mapped variant. */
 export async function pullStock(admin: Admin) {
   const { data: rows } = await admin.from("product_stock").select("loyverse_variant_id");
-  const ids = (rows ?? []).map((r) => r.loyverse_variant_id);
+  const ids = [...new Set((rows ?? []).map((r) => r.loyverse_variant_id))];
   if (!ids.length) return 0;
   const levels = await fetchLevels(ids);
   const now = new Date().toISOString();

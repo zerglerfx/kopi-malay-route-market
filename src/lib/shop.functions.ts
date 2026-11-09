@@ -41,6 +41,17 @@ function toProduct(r: Row): Product {
   };
 }
 
+async function withSharedStock(client: ReturnType<typeof publicClient>, products: Product[]) {
+  if (!products.length) return products;
+  const { data: links, error } = await client.from("shared_stock_links")
+    .select("product_id,loyverse_variant_id,product_stock(in_stock)").in("product_id", products.map((p) => p.id));
+  if (error) throw new Error(error.message);
+  return products.map((product) => {
+    const link = links?.find((row) => row.product_id === product.id);
+    return link ? { ...product, stock: { "": link.product_stock?.in_stock ?? 0 }, stock_pool: link.loyverse_variant_id } : product;
+  });
+}
+
 export const getCategories = createServerFn({ method: "GET" }).handler(async (): Promise<Category[]> => {
   const { data, error } = await publicClient().from("categories").select("id,name,slug").order("sort_order");
   if (error) throw new Error(error.message);
@@ -48,15 +59,18 @@ export const getCategories = createServerFn({ method: "GET" }).handler(async ():
 });
 
 export const getProducts = createServerFn({ method: "GET" }).handler(async (): Promise<Product[]> => {
-  const { data, error } = await publicClient().from("products").select(SELECT).eq("is_active", true).order("created_at");
+  const client = publicClient();
+  const { data, error } = await client.from("products").select(SELECT).eq("is_active", true).order("created_at");
   if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Row[]).map(toProduct);
+  return withSharedStock(client, ((data ?? []) as unknown as Row[]).map(toProduct));
 });
 
 export const getProduct = createServerFn({ method: "GET" })
   .inputValidator((d: { slug: string }) => d)
   .handler(async ({ data }): Promise<Product | null> => {
-    const { data: row, error } = await publicClient().from("products").select(SELECT).eq("is_active", true).eq("slug", data.slug).maybeSingle();
+    const client = publicClient();
+    const { data: row, error } = await client.from("products").select(SELECT).eq("is_active", true).eq("slug", data.slug).maybeSingle();
     if (error) throw new Error(error.message);
-    return row ? toProduct(row as unknown as Row) : null;
+    if (!row) return null;
+    return (await withSharedStock(client, [toProduct(row as unknown as Row)]))[0] ?? null;
   });

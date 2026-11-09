@@ -135,6 +135,7 @@ export type Database = {
           shipping_address: Json
           shipping_fee: number
           status: string
+          sticker_bundle_discount: number
           stripe_payment_intent_id: string | null
           stripe_session_id: string | null
           subtotal: number
@@ -157,6 +158,7 @@ export type Database = {
           shipping_address?: Json
           shipping_fee: number
           status?: string
+          sticker_bundle_discount?: number
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           subtotal: number
@@ -179,6 +181,7 @@ export type Database = {
           shipping_address?: Json
           shipping_fee?: number
           status?: string
+          sticker_bundle_discount?: number
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           subtotal?: number
@@ -331,6 +334,36 @@ export type Database = {
           min_order_thb?: number | null
         }
         Relationships: []
+      }
+      shared_stock_links: {
+        Row: {
+          loyverse_variant_id: string
+          product_id: string
+        }
+        Insert: {
+          loyverse_variant_id: string
+          product_id: string
+        }
+        Update: {
+          loyverse_variant_id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_stock_links_loyverse_variant_id_fkey"
+            columns: ["loyverse_variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_stock"
+            referencedColumns: ["loyverse_variant_id"]
+          },
+          {
+            foreignKeyName: "shared_stock_links_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
