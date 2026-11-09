@@ -45,7 +45,7 @@ export const listOrders = adminFn().handler(async ({ context }): Promise<AdminOr
 export const updateOrder = adminFn()
   .inputValidator((d: unknown) => z.object({
     id: z.string().uuid(),
-    status: z.enum(["pending_verification", "verified", "rejected", "shipped", "completed"]).optional(),
+    status: z.enum(["pending", "paid", "pending_verification", "verified", "rejected", "shipped", "completed"]).optional(),
     tracking_number: z.string().trim().max(80).nullable().optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
