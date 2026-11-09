@@ -140,6 +140,7 @@ export type Database = {
           stripe_session_id: string | null
           subtotal: number
           total_amount: number
+          tracking_number: string | null
           user_id: string | null
         }
         Insert: {
@@ -163,6 +164,7 @@ export type Database = {
           stripe_session_id?: string | null
           subtotal: number
           total_amount: number
+          tracking_number?: string | null
           user_id?: string | null
         }
         Update: {
@@ -186,6 +188,7 @@ export type Database = {
           stripe_session_id?: string | null
           subtotal?: number
           total_amount?: number
+          tracking_number?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -234,6 +237,7 @@ export type Database = {
           images: string[]
           is_active: boolean
           is_featured: boolean
+          is_new_arrival: boolean
           name: string
           price: number
           price_thb: number | null
@@ -251,6 +255,7 @@ export type Database = {
           images?: string[]
           is_active?: boolean
           is_featured?: boolean
+          is_new_arrival?: boolean
           name: string
           price: number
           price_thb?: number | null
@@ -268,6 +273,7 @@ export type Database = {
           images?: string[]
           is_active?: boolean
           is_featured?: boolean
+          is_new_arrival?: boolean
           name?: string
           price?: number
           price_thb?: number | null
@@ -365,14 +371,117 @@ export type Database = {
           },
         ]
       }
+      towing_requests: {
+        Row: {
+          breakdown_location: string
+          created_at: string
+          destination: string
+          id: string
+          motorcycle_model: string
+          name: string
+          phone: string
+          pickup_lat: number | null
+          pickup_lng: number | null
+          plate_number: string
+          reference: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          breakdown_location: string
+          created_at?: string
+          destination: string
+          id?: string
+          motorcycle_model: string
+          name: string
+          phone: string
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          plate_number: string
+          reference: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          breakdown_location?: string
+          created_at?: string
+          destination?: string
+          id?: string
+          motorcycle_model?: string
+          name?: string
+          phone?: string
+          pickup_lat?: number | null
+          pickup_lng?: number | null
+          plate_number?: string
+          reference?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      wishlist_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wishlist_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       redeem_promo_code: { Args: { _code: string }; Returns: boolean }
     }
     Enums: {
+      app_role: "admin" | "user"
       promo_discount_type: "percentage" | "fixed_amount"
     }
     CompositeTypes: {
@@ -501,6 +610,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "user"],
       promo_discount_type: ["percentage", "fixed_amount"],
     },
   },

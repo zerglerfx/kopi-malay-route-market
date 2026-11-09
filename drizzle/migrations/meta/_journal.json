@@ -64,6 +64,20 @@
       "when": 1794202938170,
       "tag": "0008_order_sticker_bundle_savings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794205016279,
+      "tag": "0009_admin_wishlist_towing",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794205038853,
+      "tag": "0010_first_admin_trigger",
+      "breakpoints": true
     }
   ]
 }
