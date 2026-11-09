@@ -135,6 +135,7 @@ export type Database = {
           shipping_address: Json
           shipping_fee: number
           status: string
+          sticker_bundle_discount: number
           stripe_payment_intent_id: string | null
           stripe_session_id: string | null
           subtotal: number
@@ -157,6 +158,7 @@ export type Database = {
           shipping_address?: Json
           shipping_fee: number
           status?: string
+          sticker_bundle_discount?: number
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           subtotal: number
@@ -179,6 +181,7 @@ export type Database = {
           shipping_address?: Json
           shipping_fee?: number
           status?: string
+          sticker_bundle_discount?: number
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           subtotal?: number
