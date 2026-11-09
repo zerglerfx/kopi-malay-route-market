@@ -141,6 +141,7 @@ function Checkout() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <h1 className="font-display text-3xl font-bold uppercase md:text-4xl">Checkout</h1>
+      <p className="mt-2 text-sm text-muted-foreground">No account needed — you can check out as a guest. <Link to="/auth" search={{ mode: "signup" }} className="font-medium text-foreground underline">Become a member</Link> to save your cart and wishlist.</p>
       <form noValidate onSubmit={submit} className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <section className="space-y-3">
