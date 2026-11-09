@@ -187,6 +187,41 @@ export type Database = {
         }
         Relationships: []
       }
+      product_stock: {
+        Row: {
+          id: string
+          in_stock: number
+          loyverse_variant_id: string
+          product_id: string
+          size: string
+          synced_at: string | null
+        }
+        Insert: {
+          id?: string
+          in_stock?: number
+          loyverse_variant_id: string
+          product_id: string
+          size?: string
+          synced_at?: string | null
+        }
+        Update: {
+          id?: string
+          in_stock?: number
+          loyverse_variant_id?: string
+          product_id?: string
+          size?: string
+          synced_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_stock_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string

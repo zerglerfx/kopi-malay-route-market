@@ -43,6 +43,13 @@
       "when": 1794189927456,
       "tag": "0005_order_parcel_weight",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794199751015,
+      "tag": "0006_loyverse_stock",
+      "breakpoints": true
     }
   ]
 }
