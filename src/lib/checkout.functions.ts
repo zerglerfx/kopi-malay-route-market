@@ -6,6 +6,7 @@ import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
 import { aggregateStockSales } from "./stock";
+import { stickerBundle } from "./sticker-bundle";
 
 const CheckoutInput = CheckoutDetails.extend({
   ref: z.string().regex(ORDER_REF_RE).optional(),
@@ -67,16 +68,20 @@ export const validatePromoCode = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const ids = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products } = await supabaseAdmin.from("products").select("id,price,sale_price,price_thb").eq("is_active", true).in("id", ids);
+    const { data: products } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,categories(slug)").eq("is_active", true).in("id", ids);
     const subtotal = data.items.reduce((s, i) => {
       const p = products?.find((x) => x.id === i.productId);
       if (!p) return s;
       const unit = data.country === "Thailand" ? Number(p.price_thb ?? 0) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
       return s + unit * i.quantity;
     }, 0);
+    const bundle = stickerBundle(data.items.map((i) => {
+      const p = products?.find((product) => product.id === i.productId);
+      return { name: p?.name ?? "", category_slug: p?.categories?.slug ?? "", quantity: i.quantity };
+    }), data.country);
     const promo = await loadPromo(supabaseAdmin, data.code);
-    const r = computePromoDiscount(promo, subtotal, data.country === "Thailand" ? "thb" : "myr");
-    return r.ok ? { ok: true as const, code: promo!.code.toUpperCase(), discount: r.discount, label: r.label } : { ok: false as const, error: r.error };
+    const r = computePromoDiscount(promo, subtotal - bundle.discount, data.country === "Thailand" ? "thb" : "myr");
+    return r.ok && promo ? { ok: true as const, code: promo.code.toUpperCase(), discount: r.discount, label: r.label } : { ok: false as const, error: r.ok ? "Invalid promo code" : r.error };
   });
 
 export const submitManualOrder = createServerFn({ method: "POST" })
@@ -145,6 +150,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     }
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
+    const bundle = stickerBundle(lines, data.country);
     const weight = parcelWeight(lines);
     const ship = shippingFee(data.country, lines, data.state);
     if (ship == null) throw new Error("Tumbler weight is unavailable. Please contact Kopi Malay for shipping.");
@@ -154,14 +160,15 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     let discount = 0;
     if (data.promoCode) {
       const promo = await loadPromo(supabaseAdmin, data.promoCode);
-      const r = computePromoDiscount(promo, subtotal, currency);
+      const r = computePromoDiscount(promo, subtotal - bundle.discount, currency);
       if (!r.ok) throw new Error(`Promo code: ${r.error}`);
-      const { data: redeemed } = await supabaseAdmin.rpc("redeem_promo_code", { _code: promo!.code });
+      if (!promo) throw new Error("Promo code: Invalid or expired promo code");
+      const { data: redeemed } = await supabaseAdmin.rpc("redeem_promo_code", { _code: promo.code });
       if (!redeemed) throw new Error("Promo code: Invalid or expired promo code");
-      promoCode = promo!.code.toUpperCase();
+      promoCode = promo.code.toUpperCase();
       discount = r.discount;
     }
-    const total = subtotal - discount + ship;
+    const total = subtotal - bundle.discount - discount + ship;
     const token = crypto.randomUUID();
     const ext = data.receipt.type === "application/pdf" ? "pdf" : data.receipt.type === "image/png" ? "png" : "jpg";
 
@@ -172,6 +179,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         order_number: ref, user_id: userId, guest_email: data.email, currency,
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
+        sticker_bundle_discount: bundle.discount,
         parcel_weight_kg: weight.kg, parcel_weight_complete: weight.complete,
         status: "pending_verification", payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,
       }).select("id, order_number").single();
@@ -218,7 +226,8 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         ...lines.map((l) => `• ${esc(l.name)}${l.variant ? ` (Size ${esc(l.variant)})` : ""} × ${l.quantity} — ${m(l.unit * l.quantity)}`),
         ``,
         ...(promoCode ? [`🎟️ Promo Code Applied: ${esc(promoCode)} (-${m(discount)})`] : []),
-        `💰 Subtotal ${m(subtotal)}${discount ? ` − Discount ${m(discount)}` : ""} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
+        ...(bundle.groups > 0 ? [`🏷️ 8×8cm sticker bundle: ${bundle.groups} × THB 140.00${bundle.remainder ? ` + ${bundle.remainder} × THB 49.00` : ""}; saved ${m(bundle.discount)}`] : []),
+        `💰 Subtotal ${m(subtotal)}${bundle.discount ? ` − Bundle ${m(bundle.discount)}` : ""}${discount ? ` − Discount ${m(discount)}` : ""} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
         url ? `📄 <a href="${url}">View receipt</a> (link valid 7 days)` : `📄 Receipt saved (link unavailable)`,
       ].join("\n");
       await notifyTelegram(text, url, ext === "pdf");
@@ -231,7 +240,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
 
 export type OrderSummary = {
   currency: string; order_number: string; status: string; created_at: string;
-  subtotal: number; shipping_fee: number; total_amount: number; promo_code: string | null; discount_amount: number; email: string | null;
+  subtotal: number; shipping_fee: number; total_amount: number; promo_code: string | null; discount_amount: number; sticker_bundle_discount: number; email: string | null;
   shipping_address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string; country?: string };
   items: { product_name: string; selected_variant: string; unit_price: number; quantity: number }[];
 };
@@ -246,6 +255,7 @@ export const getOrderByReference = createServerFn({ method: "GET" })
       currency: order.currency, order_number: order.order_number, status: order.status, created_at: order.created_at,
       subtotal: Number(order.subtotal), shipping_fee: Number(order.shipping_fee), total_amount: Number(order.total_amount),
       promo_code: order.promo_code, discount_amount: Number(order.discount_amount ?? 0),
+      sticker_bundle_discount: Number(order.sticker_bundle_discount ?? 0),
       email: order.guest_email, shipping_address: order.shipping_address as OrderSummary["shipping_address"],
       items: (order.order_items ?? []).map((i: { product_name: string; selected_variant: string; unit_price: number; quantity: number }) => ({
         product_name: i.product_name, selected_variant: i.selected_variant, unit_price: Number(i.unit_price), quantity: i.quantity,
