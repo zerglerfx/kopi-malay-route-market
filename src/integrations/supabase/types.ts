@@ -293,6 +293,60 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          address: string
+          city: string
+          contact_handle: string
+          country: string
+          created_at: string
+          full_name: string
+          id: string
+          motorcycle_make: string
+          motorcycle_model: string
+          motorcycle_plate: string
+          phone: string
+          postcode: string
+          preferred_contact: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string
+          city?: string
+          contact_handle?: string
+          country?: string
+          created_at?: string
+          full_name?: string
+          id: string
+          motorcycle_make?: string
+          motorcycle_model?: string
+          motorcycle_plate?: string
+          phone?: string
+          postcode?: string
+          preferred_contact?: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          city?: string
+          contact_handle?: string
+          country?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          motorcycle_make?: string
+          motorcycle_model?: string
+          motorcycle_plate?: string
+          phone?: string
+          postcode?: string
+          preferred_contact?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       promo_codes: {
         Row: {
           code: string

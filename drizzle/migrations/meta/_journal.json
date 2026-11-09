@@ -92,6 +92,13 @@
       "when": 1794210138381,
       "tag": "0012_grant_existing_first_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794211896017,
+      "tag": "0013_create_profiles",
+      "breakpoints": true
     }
   ]
 }
