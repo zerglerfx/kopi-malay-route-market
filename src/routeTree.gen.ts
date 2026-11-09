@@ -16,6 +16,7 @@ import { Route as OrderSuccessRouteImport } from './routes/order-success'
 import { Route as TowingRouteImport } from './routes/towing'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as ShopIndexRouteImport } from './routes/shop.index'
@@ -59,6 +60,11 @@ const WishlistRoute = WishlistRouteImport.update({
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/towing': typeof TowingRoute
   '/wishlist': typeof WishlistRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/profile': typeof AuthenticatedProfileRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/order-success': typeof OrderSuccessRoute
   '/towing': typeof TowingRoute
   '/wishlist': typeof WishlistRoute
+  '/profile': typeof AuthenticatedProfileRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout': typeof CheckoutIndexRoute
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/towing': typeof TowingRoute
   '/wishlist': typeof WishlistRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
   '/checkout/': typeof CheckoutIndexRoute
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/towing'
     | '/wishlist'
     | '/admin'
+    | '/profile'
     | '/product/$slug'
     | '/shop/$category'
     | '/checkout/'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/order-success'
     | '/towing'
     | '/wishlist'
+    | '/profile'
     | '/product/$slug'
     | '/shop/$category'
     | '/checkout'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/towing'
     | '/wishlist'
     | '/_authenticated/admin'
+    | '/_authenticated/profile'
     | '/product/$slug'
     | '/shop/$category'
     | '/checkout/'
@@ -291,6 +303,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/checkout/': {
@@ -387,10 +406,12 @@ const AuthenticatedAdminRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRouteWithChildren
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRouteWithChildren,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
