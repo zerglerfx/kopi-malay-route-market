@@ -226,7 +226,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         ...lines.map((l) => `• ${esc(l.name)}${l.variant ? ` (Size ${esc(l.variant)})` : ""} × ${l.quantity} — ${m(l.unit * l.quantity)}`),
         ``,
         ...(promoCode ? [`🎟️ Promo Code Applied: ${esc(promoCode)} (-${m(discount)})`] : []),
-        ...(bundle.groups > 0 ? [`🏷️ 8×8cm sticker bundle: ${bundle.groups} × THB 140.00${bundle.remainder ? ` + ${bundle.remainder} × THB 49.00` : ""}; saved ${m(bundle.discount)}`] : []),
+        ...(bundle.groups > 0 ? [`🏷️ 8×8cm sticker bundle: ${bundle.groups} × ${m(bundle.bundle)}${bundle.remainder ? ` + ${bundle.remainder} × ${m(bundle.unit)}` : ""}; saved ${m(bundle.discount)}`] : []),
         `💰 Subtotal ${m(subtotal)}${bundle.discount ? ` − Bundle ${m(bundle.discount)}` : ""}${discount ? ` − Discount ${m(discount)}` : ""} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
         url ? `📄 <a href="${url}">View receipt</a> (link valid 7 days)` : `📄 Receipt saved (link unavailable)`,
       ].join("\n");
