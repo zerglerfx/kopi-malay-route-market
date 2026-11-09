@@ -60,7 +60,7 @@ export const setTrackingLabel = createServerFn({ method: "POST" }).middleware([r
       const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(data.dataUrl);
       if (!m) throw new Error("Label must be a PNG, JPG or WEBP image");
       const type = m[1] as keyof typeof LABEL_TYPES;
-      const bytes = Uint8Array.from(atob(m[2]), (c) => c.charCodeAt(0));
+      const bytes = Uint8Array.from(atob(m[2]!), (c) => c.charCodeAt(0));
       if (bytes.byteLength > 5 * 1024 * 1024) throw new Error("Label image must be 5MB or smaller");
       path = `tracking-labels/${data.id}/${Date.now()}.${LABEL_TYPES[type]}`;
       const { error } = await admin.storage.from("payment-receipts").upload(path, bytes, { contentType: type });
