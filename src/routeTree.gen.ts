@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as OrderSuccessRouteImport } from './routes/order-success'
+import { Route as TowingRouteImport } from './routes/towing'
 import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
@@ -32,6 +33,11 @@ const AuthRoute = AuthRouteImport.update({
 const OrderSuccessRoute = OrderSuccessRouteImport.update({
   id: '/order-success',
   path: '/order-success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TowingRoute = TowingRouteImport.update({
+  id: '/towing',
+  path: '/towing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WishlistRoute = WishlistRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/order-success': typeof OrderSuccessRoute
+  '/towing': typeof TowingRoute
   '/wishlist': typeof WishlistRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/order-success': typeof OrderSuccessRoute
+  '/towing': typeof TowingRoute
   '/wishlist': typeof WishlistRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/order-success': typeof OrderSuccessRoute
+  '/towing': typeof TowingRoute
   '/wishlist': typeof WishlistRoute
   '/product/$slug': typeof ProductSlugRoute
   '/shop/$category': typeof ShopCategoryRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/order-success'
+    | '/towing'
     | '/wishlist'
     | '/product/$slug'
     | '/shop/$category'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/order-success'
+    | '/towing'
     | '/wishlist'
     | '/product/$slug'
     | '/shop/$category'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/order-success'
+    | '/towing'
     | '/wishlist'
     | '/product/$slug'
     | '/shop/$category'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   OrderSuccessRoute: typeof OrderSuccessRoute
+  TowingRoute: typeof TowingRoute
   WishlistRoute: typeof WishlistRoute
   ProductSlugRoute: typeof ProductSlugRoute
   ShopCategoryRoute: typeof ShopCategoryRoute
@@ -169,6 +182,13 @@ declare module '@tanstack/react-router' {
       path: '/order-success'
       fullPath: '/order-success'
       preLoaderRoute: typeof OrderSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/towing': {
+      id: '/towing'
+      path: '/towing'
+      fullPath: '/towing'
+      preLoaderRoute: typeof TowingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wishlist': {
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   OrderSuccessRoute: OrderSuccessRoute,
+  TowingRoute: TowingRoute,
   WishlistRoute: WishlistRoute,
   ProductSlugRoute: ProductSlugRoute,
   ShopCategoryRoute: ShopCategoryRoute,
