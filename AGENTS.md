@@ -26,6 +26,7 @@
 - Shared one-size inventory uses `shared_stock_links` pointing to a canonical `product_stock` variant; catalog reads resolve its single count and checkout aggregates mixed designs by variant before checking/deducting, preventing duplicate pool deductions.
 - Paper-sticker bundle pricing uses one browser-safe helper in checkout, promo preview, and order placement; persist bundle savings separately from promo savings so historical receipts and alerts reconcile catalog line prices with the charged total.
 - Admin access uses `user_roles` + `has_role`; every admin server function in `src/lib/admin.functions.ts` re-checks the role as the caller before using the service client, and the `/admin` route gate is only a UI convenience.
+- Designated Google admin enrollment runs in an Auth sign-in lifecycle trigger and requires a confirmed account plus a matching verified Google identity; role grants are idempotent and never trust user-editable metadata.
 - Wishlists live in localStorage for guests and `wishlist_items` for members, merged on sign-in via the shared `mergeWishlist` helper; the wishlist context lives in its own module like the cart.
 - Towing requests are inserted only through the public `submitTowingRequest` server function (table has no public policies) and alert Telegram via `telegram.server.ts`; the pick-up map loads Maps JS lazily on the client only.
 - Admin catalog edits never create Loyverse items; staff link products to existing Loyverse variants and stock stays read-only from Loyverse.
