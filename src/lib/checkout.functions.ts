@@ -5,6 +5,7 @@ import { effectivePrice, formatMoney, formatParcelWeight, parcelWeight, shipping
 import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
+import { aggregateStockSales } from "./stock";
 
 const CheckoutInput = CheckoutDetails.extend({
   ref: z.string().regex(ORDER_REF_RE).optional(),
@@ -117,16 +118,15 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     });
 
     // Stock check against live Loyverse levels for tracked items.
-    const { data: stockRows } = await supabaseAdmin.from("product_stock").select("product_id,size,loyverse_variant_id").in("product_id", ids);
-    const sold: { variantId: string; quantity: number }[] = [];
-    for (const l of lines) {
-      const tracked = (stockRows ?? []).filter((r) => r.product_id === l.productId);
-      if (!tracked.length) continue;
-      const row = tracked.find((r) => r.size === l.variant);
-      if (!row) throw new Error(`${l.name}${l.variant ? ` (Size ${l.variant})` : ""} is sold out.`);
-      const existing = sold.find((x) => x.variantId === row.loyverse_variant_id);
-      if (existing) existing.quantity += l.quantity; else sold.push({ variantId: row.loyverse_variant_id, quantity: l.quantity });
-    }
+    const { data: directRows, error: stockError } = await supabaseAdmin.from("product_stock").select("product_id,size,loyverse_variant_id").in("product_id", ids);
+    const { data: sharedRows, error: sharedError } = await supabaseAdmin.from("shared_stock_links").select("product_id,loyverse_variant_id").in("product_id", ids);
+    if (stockError || sharedError) throw new Error("Could not check stock. Please try again.");
+    const sharedIds = new Set((sharedRows ?? []).map((row) => row.product_id));
+    const stockRows = [
+      ...(directRows ?? []).filter((row) => !sharedIds.has(row.product_id)),
+      ...(sharedRows ?? []).map((row) => ({ ...row, size: "" })),
+    ];
+    const sold = aggregateStockSales(lines, stockRows);
     const loyverse = sold.length ? await import("./loyverse.server") : null;
     if (loyverse) {
       try {
