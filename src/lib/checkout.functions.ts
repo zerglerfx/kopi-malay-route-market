@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { effectivePrice, formatMoney, shippingFee } from "./shop";
+import { effectivePrice, formatMoney, formatParcelWeight, parcelWeight, shippingFee } from "./shop";
 import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
@@ -117,6 +117,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     });
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
+    const weight = parcelWeight(lines);
     const ship = shippingFee(data.country, lines, data.state);
     if (ship == null) throw new Error("Thailand tumbler shipping requires a quote. Please contact Kopi Malay.");
     const currency = data.country === "Thailand" ? "thb" : "myr";
@@ -142,6 +143,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         order_number: ref, user_id: userId, guest_email: data.email, currency,
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
+        parcel_weight_kg: weight.kg, parcel_weight_complete: weight.complete,
         status: "pending_verification", payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,
       }).select("id, order_number").single();
       if (o) order = o;
@@ -174,6 +176,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         `📍 ${esc(data.address)}, ${esc(data.city)} ${data.postcode}, ${esc(data.state)}, ${data.country}`,
         ``,
         `📦 <b>Items</b>`,
+        `⚖️ Parcel weight: ${formatParcelWeight(weight)}`,
         ...lines.map((l) => `• ${esc(l.name)}${l.variant ? ` (Size ${esc(l.variant)})` : ""} × ${l.quantity} — ${m(l.unit * l.quantity)}`),
         ``,
         ...(promoCode ? [`🎟️ Promo Code Applied: ${esc(promoCode)} (-${m(discount)})`] : []),

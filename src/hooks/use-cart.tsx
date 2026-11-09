@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { effectivePrice, mergeCartLines, type Product } from "@/lib/shop";
+import { CartContext as Ctx, type CartContextValue } from "./cart-context";
 
 export type CartItem = {
   productId: string;
@@ -13,20 +14,6 @@ export type CartItem = {
   unitPrice: number;
 };
 
-type CartCtx = {
-  items: CartItem[];
-  count: number;
-  subtotal: number;
-  open: boolean;
-  setOpen: (v: boolean) => void;
-  user: User | null;
-  add: (p: Product, variant: string, qty: number) => Promise<void>;
-  setQty: (productId: string, variant: string, qty: number) => Promise<void>;
-  remove: (productId: string, variant: string) => Promise<void>;
-  clear: () => Promise<void>;
-};
-
-const Ctx = createContext<CartCtx | null>(null);
 const LS_KEY = "km_cart";
 const SESSION_KEY = "km_session_id";
 
@@ -145,7 +132,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (u) await supabase.from("cart_items").delete().eq("user_id", u.id);
   }, []);
 
-  const value = useMemo<CartCtx>(() => ({
+  const value = useMemo<CartContextValue>(() => ({
     items, open, setOpen, user, add, setQty, remove, clear,
     count: items.reduce((s, i) => s + i.quantity, 0),
     subtotal: items.reduce((s, i) => s + i.quantity * i.unitPrice, 0),

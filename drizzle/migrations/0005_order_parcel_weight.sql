@@ -1,0 +1,5 @@
+ALTER TABLE public.orders ADD COLUMN parcel_weight_kg numeric, ADD COLUMN parcel_weight_complete boolean;
+COMMENT ON COLUMN public.orders.parcel_weight_kg IS 'Accumulated known catalog item weight in kilograms at order placement; consult parcel_weight_complete for missing weights.';
+COMMENT ON COLUMN public.orders.parcel_weight_complete IS 'True only when every ordered item has a configured catalog unit weight.';
+CREATE OR REPLACE FUNCTION public.enforce_tumbler_unit_weight() RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$ BEGIN IF EXISTS (SELECT 1 FROM public.categories WHERE id = NEW.category_id AND slug = 'tumblers') THEN NEW.weight_kg := 0.292; END IF; RETURN NEW; END; $$;
+CREATE TRIGGER enforce_tumbler_unit_weight BEFORE INSERT OR UPDATE ON public.products FOR EACH ROW EXECUTE FUNCTION public.enforce_tumbler_unit_weight();

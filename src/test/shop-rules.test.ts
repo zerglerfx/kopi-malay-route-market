@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { APPAREL_SIZES, formatMoney, formatRM, mergeCartLines, shippingFee } from "@/lib/shop";
+import { APPAREL_SIZES, formatMoney, formatRM, mergeCartLines, parcelWeight, shippingFee } from "@/lib/shop";
 
 describe("shipping", () => {
+  it("accumulates 292g per tumbler and includes other configured item weights", () => {
+    expect(parcelWeight([{ category_slug: "tumblers", quantity: 3, weight_kg: 0.292 }])).toEqual({ kg: 0.876, complete: true });
+    expect(parcelWeight([{ category_slug: "tumblers", quantity: 2, weight_kg: 0.292 }, { category_slug: "stickers", quantity: 3, weight_kg: 0.01 }])).toEqual({ kg: 0.614, complete: true });
+    expect(parcelWeight([{ category_slug: "tumblers", quantity: 1, weight_kg: 0.292 }, { category_slug: "stickers", quantity: 1 }])).toEqual({ kg: 0.292, complete: false });
+  });
+  it("uses 292g weights for Thailand thresholds while preserving Malaysian block rates", () => {
+    const lines = (quantity: number) => [{ category_slug: "tumblers", quantity, weight_kg: 0.292 }];
+    expect(shippingFee("Thailand", lines(3))).toBe(60);
+    expect(parcelWeight(lines(4)).kg).toBe(1.168);
+    expect(shippingFee("Thailand", lines(4))).toBeNull();
+    expect(shippingFee("Malaysia", lines(3), "Johor")).toBe(40);
+    expect(shippingFee("Malaysia", lines(3), "Sabah")).toBe(50);
+    expect(shippingFee("Malaysia", lines(3), "Sarawak")).toBe(50);
+  });
   it("ships jerseys free to Thailand", () => {
     expect(shippingFee("Thailand", [{ category_slug: "jerseys-t-shirts", quantity: 4 }], "Tak")).toBe(0);
   });
