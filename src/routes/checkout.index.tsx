@@ -12,7 +12,7 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, thailandTumblerShipping, type Country } from "@/lib/shop";
 
 export const Route = createFileRoute("/checkout/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
@@ -71,6 +71,7 @@ function Checkout() {
   const shippingLines = lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null }));
   const weight = parcelWeight(shippingLines);
   const ship = shippingFee(country, shippingLines, f.state);
+  const thaiShipping = country === "Thailand" ? thailandTumblerShipping(shippingLines) : null;
   const surcharge = eastMalaysiaSurcharge(country, f.state);
   const checkPromo = useServerFn(validatePromoCode);
   const [promoInput, setPromoInput] = useState("");
@@ -111,7 +112,7 @@ function Checkout() {
       return;
     }
     if (unavailable) { toast.warning("Some items are unavailable for this destination."); return; }
-    if (ship == null) { toast.warning("Please contact Kopi Malay for a Thailand tumbler shipping quote."); return; }
+    if (ship == null) { toast.warning("Tumbler weight is unavailable. Please contact Kopi Malay for shipping."); return; }
     if (!receipt) return;
     setBusy(true);
     try {
@@ -229,15 +230,20 @@ function Checkout() {
             <div className="flex justify-between gap-3"><dt>{weight.complete ? "Parcel weight" : "Known parcel weight"}</dt><dd className="text-right">{formatParcelWeight(weight)}</dd></div>
             {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
+            {thaiShipping && thaiShipping.blocks > 0 && <>
+              <div className="flex justify-between gap-3 text-muted-foreground"><dt>Tumbler weight</dt><dd className="text-right">{formatParcelWeight(thaiShipping.weight)}</dd></div>
+              <div className="flex justify-between gap-3 text-muted-foreground"><dt>Base shipping (first 1kg)</dt><dd>{money(thaiShipping.base)}</dd></div>
+              {thaiShipping.surcharge > 0 && <div className="flex justify-between gap-3 text-muted-foreground"><dt>Extra weight ({thaiShipping.blocks - 1} × 1kg tier)</dt><dd>{money(thaiShipping.surcharge)}</dd></div>}
+            </>}
             {surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
           </dl>
           {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
-          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Thailand tumbler orders of 1kg or more require a shipping quote. Please contact Kopi Malay.</p>}
+          {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Tumbler weight is unavailable. Please contact Kopi Malay for shipping.</p>}
           <Button type="submit" disabled={busy || promoBusy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Submitting…" : "Confirm Order & Submit Receipt"}
           </Button>
-          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 under 1kg. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 per started kilogram. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
         </aside>
       </form>
     </div>
