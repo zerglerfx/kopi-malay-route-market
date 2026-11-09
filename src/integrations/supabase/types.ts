@@ -127,6 +127,8 @@ export type Database = {
           guest_email: string | null
           id: string
           order_number: string
+          parcel_weight_complete: boolean | null
+          parcel_weight_kg: number | null
           payment_method: string
           promo_code: string | null
           receipt_path: string | null
@@ -147,6 +149,8 @@ export type Database = {
           guest_email?: string | null
           id?: string
           order_number: string
+          parcel_weight_complete?: boolean | null
+          parcel_weight_kg?: number | null
           payment_method?: string
           promo_code?: string | null
           receipt_path?: string | null
@@ -167,6 +171,8 @@ export type Database = {
           guest_email?: string | null
           id?: string
           order_number?: string
+          parcel_weight_complete?: boolean | null
+          parcel_weight_kg?: number | null
           payment_method?: string
           promo_code?: string | null
           receipt_path?: string | null

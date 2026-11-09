@@ -36,6 +36,13 @@
       "when": 1794146054655,
       "tag": "0004_promo_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794189927456,
+      "tag": "0005_order_parcel_weight",
+      "breakpoints": true
     }
   ]
 }
