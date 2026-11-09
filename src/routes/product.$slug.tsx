@@ -49,8 +49,8 @@ function ProductPage() {
   const sizeKey = apparel ? size : "";
   const left = apparel && !size ? null : availableStock(p, sizeKey);
   const soldOut = left !== null && left <= 0;
-  const ready = (!apparel || !!size) && !soldOut && !allSoldOut;
   const allSoldOut = !!p.stock && Object.values(p.stock).every((n) => n <= 0);
+  const ready = (!apparel || !!size) && !soldOut && !allSoldOut;
 
   const doAdd = async (buy: boolean) => {
     if (!ready) { toast.warning(soldOut ? "This item is sold out" : "Please select a size first"); return; }
