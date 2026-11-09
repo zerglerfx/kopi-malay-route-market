@@ -3,8 +3,9 @@
 This is a large update, so it ships in phases. Each phase works on its own and is checked before the next one starts.
 
 ## Phase 1 — Look & navigation
+
 - **Monochrome theme:** swap the cream and warm colours for black, white and dark grey across the whole site. Blue, red and yellow stay only as small accents (sale badges, the road stripe), unless you want them gone too.
-- **Header:** make it taller, take the "KOPI MALAY x ROUTE 1" wording out next to the logos, and keep both logos.
+- **Header:** make it taller, take the "KOPI MALAY x ROUTE 1" wording out next to the logos, and keep both logos and add x between them.
 - **Navigation:** add two dropdowns:
   - **Shop**: Shop All, Jerseys & T-shirts, Stickers, Tumblers, Fridge Magnets, Patches, Lanyard, Other Merch.
   - **Services**: Towing & Rescue.
@@ -13,6 +14,7 @@ This is a large update, so it ships in phases. Each phase works on its own and i
 - **New Arrival carousel:** replaces the static home banner. It shows products marked "New Arrival" with left and right arrows, swipe on phones and dots. Each slide links to its product.
 
 ## Phase 2 — Accounts, guest checkout & wishlist
+
 - **Login and sign-up** with Google or with email and password. Email/password already exists, so this phase adds the Google button.
 - **Guest checkout:** you can already buy without an account. This stays as it is, and the checkout page gets a short note saying so.
 - **Wishlist:** a heart button on product cards and product pages, plus a new Wishlist page.
@@ -20,15 +22,18 @@ This is a large update, so it ships in phases. Each phase works on its own and i
   - Signed-in members' wishlists are saved to their account. Anything saved as a guest is merged in when they log in.
 
 ## Phase 3 — Towing & Rescue
-- **New page `/towing`** with these fields, all required: name, plate number, motorcycle model, phone, breakdown location / distance, and towing destination address.
+
+- **New page `/towing**` with these fields, all required: name, plate number, motorcycle model, phone, breakdown location / distance, and towing destination address.
 - **Map pin:** a Google Map where the rider taps or drags a pin to set the pick-up point. A "Use my location" button fills it in automatically.
 - **After sending:** the request is saved, a Telegram alert is sent with the details and a Google Maps link to the pin, and the rider sees a reference number.
 - **Google Maps setup:** this needs the Google Maps connection to be set up. A connect card will appear for you to approve.
 
 ## Phase 4 — Admin dashboard (`/admin`, admins only)
+
 Access is checked by the server, not just hidden in the page. Your account is made the first admin.
+
 - **Orders**
-  - Table columns: NO., Nama, Alamat, No. Telefon, Payment Ref / Receipt (view the receipt, mark Verified or Rejected), Items breakdown, Order ref / tracking number (editable) with a QR code.
+  - Table columns: NO., Name, Address, Phone Number, Payment Ref / Receipt (view the receipt, mark Verified or Rejected), Items breakdown, Order ref / tracking number (editable) with a QR code.
   - Search by phone number.
   - Export to CSV, which opens in Excel.
 - **Promo codes:** create, edit, turn on or off, and see how many times each was used.
@@ -42,11 +47,13 @@ Access is checked by the server, not just hidden in the page. Your account is ma
   - Products are not created automatically in Loyverse. You add new items in Loyverse first, then link them here. This avoids duplicates in your shop register.
 
 ## Things to confirm
-1. **First admin:** which login email should get admin access?
-2. **Accent colours:** remove all colour, or keep small red and yellow accents?
-3. **Tracking number:** "QR Code / Tracking" is assumed to mean an order QR code plus a courier tracking number field.
+
+1. **First admin:** which login email should get admin access? zerglerfx@gmail.com
+2. **Accent colours:** remove all colour, or keep small red and yellow accents? Remove all colour
+3. **Tracking number:** "QR Code / Tracking" is assumed to mean an order QR code plus a courier tracking number field. Yes
 
 ## Technical details
+
 - **New tables, all with access rules:**
   - `user_roles` (with an `app_role` enum and a `has_role` function)
   - `wishlist_items` (owner-only)
