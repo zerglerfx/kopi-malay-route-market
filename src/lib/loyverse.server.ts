@@ -13,11 +13,11 @@ type Level = { variant_id: string; store_id: string; in_stock: number };
 
 export async function fetchLevels(variantIds: string[]): Promise<Level[]> {
   const out: Level[] = [];
-  for (let i = 0; i < variantIds.length; i += 100) {
+  for (let i = 0; i < variantIds.length; i += 20) {
     let cursor: string | undefined;
     do {
       const url = new URL(`${API}/inventory`);
-      url.searchParams.set("variant_ids", variantIds.slice(i, i + 100).join(","));
+      url.searchParams.set("variant_ids", variantIds.slice(i, i + 20).join(","));
       url.searchParams.set("limit", "250");
       if (cursor) url.searchParams.set("cursor", cursor);
       const r = await fetch(url, { headers: headers() });
