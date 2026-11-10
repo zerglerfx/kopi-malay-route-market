@@ -18,7 +18,7 @@ function TowingAdmin() {
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full min-w-[900px] text-sm">
         <thead className="bg-muted text-left font-display text-xs uppercase">
-          <tr>{["Ref", "Rider", "Motorcycle", "Breakdown", "Destination", "Map", "Status"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
+          <tr>{["Ref", "Rider", "Motorcycle", "Breakdown", "Destination", "Status"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
         </thead>
         <tbody>
           {data.map((t) => (
@@ -28,7 +28,6 @@ function TowingAdmin() {
               <td className="px-3 py-2">{t.motorcycle_model}<div className="text-xs text-muted-foreground">{t.plate_number}</div></td>
               <td className="max-w-[220px] px-3 py-2">{t.breakdown_location}</td>
               <td className="max-w-[220px] px-3 py-2">{t.destination}</td>
-              <td className="px-3 py-2">{t.pickup_lat != null ? <a target="_blank" rel="noreferrer" className="underline" href={`https://www.google.com/maps?q=${t.pickup_lat},${t.pickup_lng}`}>Open map</a> : "—"}</td>
               <td className="px-3 py-2">
                 <select value={t.status} onChange={async (e) => {
                   try { await save({ data: { id: t.id, status: e.target.value as (typeof TOWING_STATUSES)[number] } }); toast.success("Updated"); qc.invalidateQueries({ queryKey: ["admin", "towing"] }); }

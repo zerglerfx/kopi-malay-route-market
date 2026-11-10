@@ -13,14 +13,17 @@ export const submitTowingRequest = createServerFn({ method: "POST" })
       if (!error) break;
       if (error.code !== "23505" || i === 4) throw new Error("Could not save your request. Please call us directly.");
     }
-    const map = data.pickup_lat != null && data.pickup_lng != null ? `https://www.google.com/maps?q=${data.pickup_lat},${data.pickup_lng}` : null;
+    const tel = data.phone.replace(/[^\d+]/g, "");
+    const time = new Date().toLocaleString("en-GB", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "short", timeStyle: "short" });
     await sendTelegram([
-      `🚨 <b>Towing &amp; Rescue request ${reference}</b>`,
-      `👤 ${escHtml(data.name)} · ${escHtml(data.phone)}`,
-      `🏍️ ${escHtml(data.motorcycle_model)} · Plate ${escHtml(data.plate_number)}`,
+      `🚨 <b>TOWING &amp; RESCUE REQUEST ${reference}</b>`,
+      "",
+      `👤 Rider: ${escHtml(data.name)}`,
+      `📞 Phone: <a href="tel:${escHtml(tel)}">${escHtml(data.phone)}</a>${tel ? ` · <a href="https://wa.me/${escHtml(tel.replace("+", ""))}">WhatsApp</a>` : ""}`,
+      `🏍️ Motorcycle: ${escHtml(data.motorcycle_model)} (Plate: ${escHtml(data.plate_number)})`,
       `📍 Breakdown: ${escHtml(data.breakdown_location)}`,
-      map ? `🗺️ Pin: ${map}` : "🗺️ No map pin provided",
       `🏁 Destination: ${escHtml(data.destination)}`,
+      `⏰ Time: ${time} (UTC+8)`,
     ].join("\n")).catch((e) => console.error("Towing alert failed", e));
     return { reference };
   });
