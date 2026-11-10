@@ -113,6 +113,13 @@
       "when": 1794213856406,
       "tag": "0015_add_order_tracking_label",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1794281435381,
+      "tag": "0016_add_sale_price_thb",
+      "breakpoints": true
     }
   ]
 }

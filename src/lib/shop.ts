@@ -55,6 +55,7 @@ export type Product = {
   price: number;
   sale_price: number | null;
   price_thb: number | null;
+  sale_price_thb?: number | null;
   weight_kg?: number | null;
   images: string[];
   variants: { sizes?: string[] };
@@ -73,6 +74,12 @@ export type Category = { id: string; name: string; slug: string };
 
 export function effectivePrice(p: { price: number; sale_price: number | null }): number {
   return p.sale_price != null && p.sale_price < p.price ? p.sale_price : p.price;
+}
+
+/** Thai price after an optional THB sale (only when lower than the regular THB price). */
+export function effectivePriceThb(p: { price_thb: number | null; sale_price_thb?: number | null }): number | null {
+  if (p.price_thb == null) return null;
+  return p.sale_price_thb != null && p.sale_price_thb < p.price_thb ? p.sale_price_thb : p.price_thb;
 }
 
 export function isApparel(p: { variants: { sizes?: string[] } }): boolean {
@@ -136,7 +143,7 @@ export function shippingFee(country: Country, lines: ShippingLine[], state = "")
   return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 20)) + eastMalaysiaSurcharge(country, state);
 }
 export function destinationPrice(p: Product, country: Country): number | null {
-  return country === "Thailand" ? p.price_thb : effectivePrice(p);
+  return country === "Thailand" ? effectivePriceThb(p) : effectivePrice(p);
 }
 export function formatMoney(value: number, currency: string): string {
   return `${currency.toLowerCase() === "thb" ? "THB" : "RM"} ${value.toFixed(2)}`;

@@ -245,6 +245,7 @@ export type Database = {
           price: number
           price_thb: number | null
           sale_price: number | null
+          sale_price_thb: number | null
           slug: string
           stock_qty: number
           variants: Json
@@ -263,6 +264,7 @@ export type Database = {
           price: number
           price_thb?: number | null
           sale_price?: number | null
+          sale_price_thb?: number | null
           slug: string
           stock_qty?: number
           variants?: Json
@@ -281,6 +283,7 @@ export type Database = {
           price?: number
           price_thb?: number | null
           sale_price?: number | null
+          sale_price_thb?: number | null
           slug?: string
           stock_qty?: number
           variants?: Json

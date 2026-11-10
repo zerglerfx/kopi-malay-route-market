@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import useEmblaCarousel from "embla-carousel-react";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { effectivePrice, formatRM, imageFor, type Product } from "@/lib/shop";
+import { effectivePrice, effectivePriceThb, formatRM, imageFor, type Product } from "@/lib/shop";
 
 export function NewArrivalCarousel({ products }: { products: Product[] }) {
   const [ref, api] = useEmblaCarousel({ loop: true, align: "start" });
@@ -28,7 +28,7 @@ export function NewArrivalCarousel({ products }: { products: Product[] }) {
                 <div className="order-2 md:order-1">
                   <span className="inline-block rounded-sm bg-ink-foreground px-2 py-1 font-display text-xs font-bold uppercase text-ink">New arrival</span>
                   <h2 className="mt-4 font-display text-4xl font-bold uppercase leading-[0.95] md:text-6xl">{p.name}</h2>
-                  <p className="mt-3 text-lg text-ink-foreground/80">{formatRM(effectivePrice(p))}{p.price_thb != null && ` / THB ${p.price_thb.toFixed(2)}`}</p>
+                  <p className="mt-3 text-lg text-ink-foreground/80">{formatRM(effectivePrice(p))}{p.price_thb != null && ` / THB ${effectivePriceThb(p)!.toFixed(2)}`}</p>
                   <Link to="/product/$slug" params={{ slug: p.slug }} className="mt-6 inline-block rounded-md bg-ink-foreground px-6 py-3 font-display font-semibold uppercase text-ink hover:opacity-90">Shop now</Link>
                 </div>
                 <Link to="/product/$slug" params={{ slug: p.slug }} className="order-1 md:order-2">
