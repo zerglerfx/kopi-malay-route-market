@@ -24,6 +24,6 @@ export const submitTowingRequest = createServerFn({ method: "POST" })
       `📍 Breakdown: ${escHtml(data.breakdown_location)}`,
       `🏁 Destination: ${escHtml(data.destination)}`,
       `⏰ Time: ${time} (UTC+8)`,
-    ].join("\n")).catch((e) => console.error("Towing alert failed", e));
+    ].join("\n"), "towing");
     return { reference };
   });
