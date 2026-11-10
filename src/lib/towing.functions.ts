@@ -15,7 +15,7 @@ export const submitTowingRequest = createServerFn({ method: "POST" })
     }
     const tel = data.phone.replace(/[^\d+]/g, "");
     const time = new Date().toLocaleString("en-GB", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "short", timeStyle: "short" });
-    await sendTelegram([
+    void sendTelegram([
       `🚨 <b>TOWING &amp; RESCUE REQUEST ${reference}</b>`,
       "",
       `👤 Rider: ${escHtml(data.name)}`,
@@ -24,6 +24,6 @@ export const submitTowingRequest = createServerFn({ method: "POST" })
       `📍 Breakdown: ${escHtml(data.breakdown_location)}`,
       `🏁 Destination: ${escHtml(data.destination)}`,
       `⏰ Time: ${time} (UTC+8)`,
-    ].join("\n")).catch((e) => console.error("Towing alert failed", e));
+    ].join("\n"), "towing");
     return { reference };
   });
