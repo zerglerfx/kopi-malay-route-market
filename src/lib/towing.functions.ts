@@ -15,7 +15,7 @@ export const submitTowingRequest = createServerFn({ method: "POST" })
     }
     const tel = data.phone.replace(/[^\d+]/g, "");
     const time = new Date().toLocaleString("en-GB", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "short", timeStyle: "short" });
-    void sendTelegram([
+    await sendTelegram([
       `🚨 <b>TOWING &amp; RESCUE REQUEST ${reference}</b>`,
       "",
       `👤 Rider: ${escHtml(data.name)}`,
