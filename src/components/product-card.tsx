@@ -20,7 +20,7 @@ export function PriceTag({ p, className = "" }: { p: Product; className?: string
 export function ProductCard({ p }: { p: Product }) {
   const { add, setOpen } = useCart();
   const [picking, setPicking] = useState(false);
-  const onSale = effectivePrice(p) < p.price;
+  const onSale = effectivePrice(p) < p.price || (p.price_thb != null && (effectivePriceThb(p) ?? p.price_thb) < p.price_thb);
 
   const addWith = async (variant: string) => {
     await add(p, variant, 1);

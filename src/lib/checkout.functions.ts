@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { effectivePrice, formatMoney, formatParcelWeight, parcelWeight, shippingFee, thailandTumblerShipping } from "./shop";
+import { effectivePrice, effectivePriceThb, formatMoney, formatParcelWeight, parcelWeight, shippingFee, thailandTumblerShipping } from "./shop";
 import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
