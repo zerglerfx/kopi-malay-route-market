@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { linkStock, listAdminProducts, listLoyverseVariants, saveProduct, syncLoyverseStock } from "@/lib/admin.functions";
 import { imageFor } from "@/lib/shop";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/admin/products")({ component: ProductsAdmin });
 
@@ -68,8 +69,11 @@ function ProductsAdmin() {
       </div>
       <p className="text-xs text-muted-foreground">Stock counts come from Loyverse (master record) and are read-only here. Add new items in Loyverse first, then link them below.</p>
 
+      <Dialog open={!!d} onOpenChange={(o) => { if (!o) setD(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader><DialogTitle>{d?.id ? "Edit product" : "Add product"}</DialogTitle></DialogHeader>
       {d && (
-        <form onSubmit={submit} className="grid gap-3 rounded-md border p-4 sm:grid-cols-4">
+        <form onSubmit={submit} className="grid gap-3 sm:grid-cols-4">
           <label className="text-sm sm:col-span-2">Name<input required className={input} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value, slug: d.id ? d.slug : slugify(e.target.value) })} /></label>
           <label className="text-sm">Web address (slug)<input required className={input} value={d.slug} onChange={(e) => setD({ ...d, slug: e.target.value })} /></label>
           <label className="text-sm">Category<select className={input} value={d.category_id} onChange={(e) => setD({ ...d, category_id: e.target.value })}>{data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
@@ -91,6 +95,8 @@ function ProductsAdmin() {
           </div>
         </form>
       )}
+        </DialogContent>
+      </Dialog>
 
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full min-w-[1000px] text-sm">
