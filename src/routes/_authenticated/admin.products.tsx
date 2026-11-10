@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { linkStock, listAdminProducts, listLoyverseVariants, saveProduct, syncLoyverseStock } from "@/lib/admin.functions";
 import { imageFor } from "@/lib/shop";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/admin/products")({ component: ProductsAdmin });
@@ -27,6 +28,27 @@ function ProductsAdmin() {
   const [d, setD] = useState<Draft | null>(null);
   const [filter, setFilter] = useState("");
   const [syncing, setSyncing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const uploadPhotos = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setUploading(true);
+    const added: string[] = [];
+    try {
+      for (const f of Array.from(files)) {
+        if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) { toast.error(`${f.name}: only PNG, JPG or WEBP`); continue; }
+        if (f.size > 5 * 1024 * 1024) { toast.error(`${f.name}: larger than 5MB`); continue; }
+        const ext = f.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await supabase.storage.from("product-images").upload(path, f, { contentType: f.type });
+        if (error) { toast.error(`${f.name}: ${error.message}`); continue; }
+        added.push(`/api/public/product-image/${path}`);
+      }
+      if (added.length) {
+        setD((cur) => cur ? { ...cur, images: [...cur.images.split("\n").map((s) => s.trim()).filter(Boolean), ...added].join("\n") } : cur);
+        toast.success(`${added.length} photo(s) uploaded — click Save to keep them`);
+      }
+    } finally { setUploading(false); }
+  };
   const refresh = () => { qc.invalidateQueries({ queryKey: ["admin", "products"] }); qc.invalidateQueries({ queryKey: ["products"] }); };
 
   const edit = (p?: P) => setD(p ? {
@@ -83,7 +105,26 @@ function ProductsAdmin() {
           <label className="text-sm">Sale price THB<input type="number" step="0.01" min={0} className={input} value={d.sale_price_thb} onChange={(e) => setD({ ...d, sale_price_thb: e.target.value })} /></label>
           <label className="text-sm">Weight (kg)<input type="number" step="0.001" min={0} className={input} value={d.weight_kg} onChange={(e) => setD({ ...d, weight_kg: e.target.value })} /></label>
           <label className="text-sm sm:col-span-4">Description<textarea rows={3} className={input} value={d.description} onChange={(e) => setD({ ...d, description: e.target.value })} /></label>
-          <label className="text-sm sm:col-span-2">Photos (one image link per line)<textarea rows={3} className={input} value={d.images} onChange={(e) => setD({ ...d, images: e.target.value })} /></label>
+          <div className="text-sm sm:col-span-2">
+            <div className="flex items-center justify-between gap-2">
+              <span>Photos (first = cover)</span>
+              <label className={`cursor-pointer rounded-md border px-3 py-1 text-xs font-semibold ${uploading ? "opacity-50" : ""}`}>
+                {uploading ? "Uploading…" : "Upload photo"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" disabled={uploading} onChange={(e) => { uploadPhotos(e.target.files); e.target.value = ""; }} />
+              </label>
+            </div>
+            {d.images.split("\n").filter((s) => s.trim()).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {d.images.split("\n").map((s) => s.trim()).filter(Boolean).map((url, i, arr) => (
+                  <div key={url + i} className="relative">
+                    <img src={imageFor(url)} alt="" className="size-16 rounded border bg-muted object-contain" />
+                    <button type="button" aria-label="Remove photo" onClick={() => setD({ ...d, images: arr.filter((_, j) => j !== i).join("\n") })} className="absolute -right-1 -top-1 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <textarea rows={3} className={`${input} mt-2`} placeholder="Or paste image links, one per line" value={d.images} onChange={(e) => setD({ ...d, images: e.target.value })} />
+          </div>
           <label className="text-sm sm:col-span-2">Sizes (comma separated, apparel only)<input className={input} placeholder="S, M, L, XL" value={d.sizes} onChange={(e) => setD({ ...d, sizes: e.target.value })} /></label>
           <div className="flex flex-wrap gap-4 text-sm sm:col-span-4">
             <label className="flex items-center gap-2"><input type="checkbox" checked={d.is_new_arrival} onChange={(e) => setD({ ...d, is_new_arrival: e.target.checked })} /> New Arrival (home slider)</label>

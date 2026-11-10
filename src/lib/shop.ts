@@ -39,7 +39,7 @@ const IMAGES: Record<string, string> = {
 
 export function imageFor(key: string | undefined): string {
   if (!key) return tee;
-  if (key.startsWith("http") || key.startsWith("/__l5e/assets-v1/")) return key;
+  if (key.startsWith("http") || key.startsWith("/__l5e/assets-v1/") || key.startsWith("/api/public/product-image/")) return key;
   return IMAGES[key] ?? tee;
 }
 

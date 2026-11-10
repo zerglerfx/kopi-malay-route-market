@@ -120,6 +120,13 @@
       "when": 1794281435381,
       "tag": "0016_add_sale_price_thb",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794282776590,
+      "tag": "0017_product_images_admin_policies",
+      "breakpoints": true
     }
   ]
 }
