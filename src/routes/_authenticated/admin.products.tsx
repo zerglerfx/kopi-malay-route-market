@@ -149,7 +149,7 @@ function StockCell({ p, data, onChange }: { p: P; data: Data; onChange: () => vo
           </div>
         );
       })}
-      <button onClick={() => setOpen(!open)} className="underline">{open ? "Done" : "Link to Loyverse"}</button>
+      <button onClick={() => setOpen(!open)} className="underline">{open ? "Done" : rows.some((x) => x.loyverse_variant_id) ? "Edit link" : "Link to Loyverse"}</button>
     </div>
   );
 }
