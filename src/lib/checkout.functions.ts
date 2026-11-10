@@ -52,11 +52,11 @@ export const validatePromoCode = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const ids = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,categories(slug)").eq("is_active", true).in("id", ids);
+    const { data: products } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,sale_price_thb,categories(slug)").eq("is_active", true).in("id", ids);
     const subtotal = data.items.reduce((s, i) => {
       const p = products?.find((x) => x.id === i.productId);
       if (!p) return s;
-      const unit = data.country === "Thailand" ? Number(p.price_thb ?? 0) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
+      const unit = data.country === "Thailand" ? Number(effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) ?? 0) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
       return s + unit * i.quantity;
     }, 0);
     const bundle = stickerBundle(data.items.map((i) => {
@@ -93,7 +93,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     if (!magicOk(bytes, data.receipt.type)) throw new Error("Receipt file looks invalid. Please upload a PNG, JPG or PDF.");
 
     const ids = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,weight_kg,variants,categories(slug)").eq("is_active", true).in("id", ids);
+    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,sale_price_thb,weight_kg,variants,categories(slug)").eq("is_active", true).in("id", ids);
     if (error) throw new Error(error.message);
 
     const lines = data.items.map((i) => {
@@ -102,7 +102,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       const sizes = ((p.variants as { sizes?: string[] })?.sizes ?? []);
       if (sizes.length && !sizes.includes(i.variant)) throw new Error(`Please choose a size for ${p.name}.`);
       if (data.country === "Thailand" && p.price_thb == null) throw new Error(`Thailand pricing is not available yet for ${p.name}.`);
-      const unit = data.country === "Thailand" ? Number(p.price_thb) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
+      const unit = data.country === "Thailand" ? Number(effectivePriceThb({ price_thb: Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) })) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
       return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "" };
     });
 

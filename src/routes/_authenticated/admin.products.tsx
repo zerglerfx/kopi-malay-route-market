@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/admin/products")({ compone
 
 type Data = Awaited<ReturnType<typeof listAdminProducts>>;
 type P = Data["products"][number];
-type Draft = { id?: string; name: string; slug: string; description: string; category_id: string; price: string; sale_price: string; price_thb: string; weight_kg: string; images: string; sizes: string; is_featured: boolean; is_new_arrival: boolean; is_active: boolean };
+type Draft = { id?: string; name: string; slug: string; description: string; category_id: string; price: string; sale_price: string; price_thb: string; sale_price_thb: string; weight_kg: string; images: string; sizes: string; is_featured: boolean; is_new_arrival: boolean; is_active: boolean };
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 const str = (n: unknown) => (n == null ? "" : String(n));
 const input = "w-full rounded border bg-card px-2 py-1.5 text-sm";
@@ -30,9 +30,9 @@ function ProductsAdmin() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ["admin", "products"] }); qc.invalidateQueries({ queryKey: ["products"] }); };
 
   const edit = (p?: P) => setD(p ? {
-    id: p.id, name: p.name, slug: p.slug, description: p.description, category_id: p.category_id, price: str(p.price), sale_price: str(p.sale_price), price_thb: str(p.price_thb),
+    id: p.id, name: p.name, slug: p.slug, description: p.description, category_id: p.category_id, price: str(p.price), sale_price: str(p.sale_price), price_thb: str(p.price_thb), sale_price_thb: str(p.sale_price_thb),
     weight_kg: str(p.weight_kg), images: p.images.join("\n"), sizes: p.sizes.join(", "), is_featured: p.is_featured, is_new_arrival: p.is_new_arrival, is_active: p.is_active,
-  } : { name: "", slug: "", description: "", category_id: data?.categories[0]?.id ?? "", price: "", sale_price: "", price_thb: "", weight_kg: "", images: "", sizes: "", is_featured: false, is_new_arrival: true, is_active: true });
+  } : { name: "", slug: "", description: "", category_id: data?.categories[0]?.id ?? "", price: "", sale_price: "", price_thb: "", sale_price_thb: "", weight_kg: "", images: "", sizes: "", is_featured: false, is_new_arrival: true, is_active: true });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +40,7 @@ function ProductsAdmin() {
     try {
       await save({ data: {
         id: d.id, name: d.name, slug: d.slug || slugify(d.name), description: d.description, category_id: d.category_id,
-        price: Number(d.price), sale_price: num(d.sale_price), price_thb: num(d.price_thb), weight_kg: num(d.weight_kg),
+        price: Number(d.price), sale_price: num(d.sale_price), price_thb: num(d.price_thb), sale_price_thb: num(d.sale_price_thb), weight_kg: num(d.weight_kg),
         images: d.images.split("\n").map((s) => s.trim()).filter(Boolean), sizes: d.sizes.split(",").map((s) => s.trim()).filter(Boolean),
         is_featured: d.is_featured, is_new_arrival: d.is_new_arrival, is_active: d.is_active,
       } });
@@ -80,6 +80,7 @@ function ProductsAdmin() {
           <label className="text-sm">Price RM<input required type="number" step="0.01" min={0} className={input} value={d.price} onChange={(e) => setD({ ...d, price: e.target.value })} /></label>
           <label className="text-sm">Sale price RM<input type="number" step="0.01" min={0} className={input} value={d.sale_price} onChange={(e) => setD({ ...d, sale_price: e.target.value })} /></label>
           <label className="text-sm">Price THB<input type="number" step="0.01" min={0} className={input} value={d.price_thb} onChange={(e) => setD({ ...d, price_thb: e.target.value })} /></label>
+          <label className="text-sm">Sale price THB<input type="number" step="0.01" min={0} className={input} value={d.sale_price_thb} onChange={(e) => setD({ ...d, sale_price_thb: e.target.value })} /></label>
           <label className="text-sm">Weight (kg)<input type="number" step="0.001" min={0} className={input} value={d.weight_kg} onChange={(e) => setD({ ...d, weight_kg: e.target.value })} /></label>
           <label className="text-sm sm:col-span-4">Description<textarea rows={3} className={input} value={d.description} onChange={(e) => setD({ ...d, description: e.target.value })} /></label>
           <label className="text-sm sm:col-span-2">Photos (one image link per line)<textarea rows={3} className={input} value={d.images} onChange={(e) => setD({ ...d, images: e.target.value })} /></label>
@@ -108,7 +109,7 @@ function ProductsAdmin() {
                 <td className="px-3 py-2 font-medium">{p.name}</td>
                 <td className="px-3 py-2">{cat(p.category_id)}</td>
                 <td className="px-3 py-2">{p.sale_price != null ? <><s>{p.price.toFixed(2)}</s> {p.sale_price.toFixed(2)}</> : p.price.toFixed(2)}</td>
-                <td className="px-3 py-2">{p.price_thb?.toFixed(2) ?? "—"}</td>
+                <td className="px-3 py-2">{p.price_thb == null ? "—" : p.sale_price_thb != null && p.sale_price_thb < p.price_thb ? <><s>{p.price_thb.toFixed(2)}</s> {p.sale_price_thb.toFixed(2)}</> : p.price_thb.toFixed(2)}</td>
                 <td className="px-3 py-2">{p.weight_kg != null ? `${p.weight_kg} kg` : "—"}</td>
                 <td className="px-3 py-2"><StockCell p={p} data={data} onChange={refresh} /></td>
                 <td className="px-3 py-2 text-xs">{[p.is_new_arrival && "New", p.is_featured && "Best seller", !p.is_active && "Hidden"].filter(Boolean).join(", ")}</td>
