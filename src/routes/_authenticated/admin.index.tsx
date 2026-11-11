@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, ImagePlus, QrCode, Trash2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { listOrders, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
+import { listOrders, markOrderStock, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
+import { STOCK_LABEL } from "@/lib/order-stock";
 import { digits, fullAddress, itemsText, ordersToCsv } from "@/lib/admin-csv";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -24,6 +25,13 @@ function OrdersAdmin() {
   const [labelOrder, setLabelOrder] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const saveLabel = useServerFn(setTrackingLabel);
+  const markStock = useServerFn(markOrderStock);
+  const [shortfall, setShortfall] = useState<{ item: string; needed: number; available: number }[] | null>(null);
+  const markRestored = async (o: AdminOrder) => {
+    if (!confirm(`Only do this after adding ${o.order_number}'s items back in Loyverse yourself. Mark as restored?`)) return;
+    try { await markStock({ data: { id: o.id, stock_status: "restored" } }); toast.success("Marked as restored"); void qc.invalidateQueries({ queryKey: ["admin", "orders"] }); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
+  };
 
   const uploadLabel = async (o: AdminOrder, file: File | null) => {
     if (file && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("Please choose a PNG, JPG or WEBP image"); return; }
@@ -44,8 +52,12 @@ function OrdersAdmin() {
   }, [data, phone]);
 
   const patch = async (id: string, p: { status?: (typeof STATUS)[number]; tracking_number?: string | null }) => {
-    try { await save({ data: { id, ...p } }); toast.success("Order updated"); qc.invalidateQueries({ queryKey: ["admin", "orders"] }); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
+    try {
+      const r = await save({ data: { id, ...p } });
+      if (!r.ok) setShortfall(r.shortfall);
+      else toast.success("Order updated");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
+    finally { void qc.invalidateQueries({ queryKey: ["admin", "orders"] }); }
   };
 
   const exportCsv = () => {
@@ -115,6 +127,8 @@ function OrdersAdmin() {
                     <select value={o.status} onChange={(e) => patch(o.id, { status: e.target.value as (typeof STATUS)[number] })} className="rounded border bg-card px-2 py-1 text-xs capitalize">
                       {STATUS.map((s) => <option key={s} value={s}>{label(s)}</option>)}
                     </select>
+                    <div className={`mt-2 inline-block rounded border px-2 py-0.5 text-xs ${o.stock_status === "deducted" ? "bg-primary text-primary-foreground" : o.stock_status === "unknown" ? "border-dashed" : "text-muted-foreground"}`}>{STOCK_LABEL[o.stock_status]}</div>
+                    {o.stock_status === "unknown" && o.status === "rejected" && <button onClick={() => void markRestored(o)} className="mt-1 block rounded border px-2 py-0.5 text-xs hover:bg-muted">Mark restored</button>}
                   </td>
                 </tr>
               ))}
@@ -127,6 +141,13 @@ function OrdersAdmin() {
         <DialogContent className="max-w-xs">
           <DialogHeader><DialogTitle>{qr?.order_number}</DialogTitle></DialogHeader>
           {qr && <div className="grid place-items-center gap-2 bg-background p-4"><QRCodeSVG value={`${qr.order_number}${qr.tracking_number ? ` | ${qr.tracking_number}` : ""}`} size={200} /><p className="text-sm">{qr.tracking_number ?? "No tracking number yet"}</p></div>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!shortfall} onOpenChange={(v) => !v && setShortfall(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Not enough stock in Loyverse</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">The order was not verified and no stock was changed.</p>
+          <ul className="mt-2 space-y-1 text-sm">{shortfall?.map((s, i) => <li key={i} className="flex justify-between gap-4 border-b py-1"><span>{s.item}</span><span>need {s.needed} · have {s.available} · short {s.needed - s.available}</span></li>)}</ul>
         </DialogContent>
       </Dialog>
       <Dialog open={!!labelOrder} onOpenChange={(v) => !v && setLabelOrder(null)}>
