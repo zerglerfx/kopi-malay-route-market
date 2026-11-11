@@ -3,6 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { AdminOrderRow } from "./admin-csv";
 import { TOWING_STATUSES } from "./towing";
+import { planStockAction, type StockStatus } from "./order-stock";
+type StockDelta = { variantId: string; quantity: number };
 
 type Ctx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: "admin" }) => PromiseLike<{ data: boolean | null }> }; userId: string };
 
@@ -22,12 +24,12 @@ export const checkAdmin = createServerFn({ method: "GET" }).middleware([requireS
 });
 
 // ---------- Orders ----------
-export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; promo_code: string | null };
+export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; promo_code: string | null; stock_status: StockStatus };
 
 export const listOrders = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }): Promise<AdminOrder[]> => {
   const admin = await adminClient(context as unknown as Ctx);
   const { data, error } = await admin.from("orders")
-    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,order_items(product_name,selected_variant,quantity)")
+    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
     .order("created_at", { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
   const paths = (data ?? []).flatMap((o) => [o.receipt_path, o.tracking_label_path]).filter((p): p is string => !!p);
@@ -38,6 +40,7 @@ export const listOrders = createServerFn({ method: "POST" }).middleware([require
     promo_code: o.promo_code, payment_method: o.payment_method, tracking_number: o.tracking_number, email: o.guest_email,
     address: (o.shipping_address ?? {}) as AdminOrderRow["address"],
     items: o.order_items ?? [],
+    stock_status: o.stock_status as StockStatus,
     receipt_url: signed.find((s) => s.path === o.receipt_path)?.signedUrl ?? null,
     label_url: o.tracking_label_path ? signed.find((s) => s.path === o.tracking_label_path)?.signedUrl ?? null : null,
   }));
@@ -78,13 +81,74 @@ export const updateOrder = createServerFn({ method: "POST" }).middleware([requir
     status: z.enum(["pending", "paid", "pending_verification", "verified", "rejected", "shipped", "completed"]).optional(),
     tracking_number: z.string().trim().max(80).nullable().optional(),
   }).parse(d))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<{ ok: true } | { ok: false; shortfall: { item: string; needed: number; available: number }[] }> => {
     const admin = await adminClient(context as unknown as Ctx);
     const patch: { status?: string; tracking_number?: string | null } = {};
-    if (data.status !== undefined) patch.status = data.status;
     if (data.tracking_number !== undefined) patch.tracking_number = data.tracking_number;
+    if (data.status !== undefined) {
+      const { data: cur, error: e } = await admin.from("orders").select("stock_status,stock_deductions").eq("id", data.id).single();
+      if (e || !cur) throw new Error(e?.message ?? "Order not found");
+      const prev = cur.stock_status as StockStatus;
+      const action = planStockAction(prev, data.status);
+      if (action !== "none") {
+        const deltas = (cur.stock_deductions ?? []) as StockDelta[];
+        // Atomic claim: only one request can move the order out of `prev`.
+        const { data: claimed } = await admin.from("orders").update({ stock_status: action === "deduct" ? "deducting" : "restoring" }).eq("id", data.id).eq("stock_status", prev).select("id");
+        if (!claimed?.length) throw new Error("This order's stock was just updated elsewhere. Refresh and try again.");
+        const revert = () => admin.from("orders").update({ stock_status: prev }).eq("id", data.id);
+        try {
+          const lv = await import("./loyverse.server");
+          if (action === "deduct") {
+            const short = await lv.findShortfall(deltas);
+            if (short.length) {
+              await revert();
+              return { ok: false, shortfall: await describeShortfall(admin, short) };
+            }
+          }
+          await lv.adjustStock(admin, deltas, action === "deduct" ? -1 : 1);
+        } catch (err) {
+          await revert();
+          console.error("Loyverse stock update failed", err);
+          throw new Error(`Could not ${action === "deduct" ? "deduct" : "restore"} stock in Loyverse. Status not changed. Please try again.`);
+        }
+        const now = new Date().toISOString();
+        const { error } = await admin.from("orders").update(action === "deduct"
+          ? { ...patch, status: data.status, stock_status: "deducted", stock_deducted_at: now }
+          : { ...patch, status: data.status, stock_status: "restored", stock_restored_at: now }).eq("id", data.id);
+        if (error) throw new Error(error.message);
+        return { ok: true };
+      }
+      patch.status = data.status;
+    }
     const { error } = await admin.from("orders").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+async function describeShortfall(admin: Awaited<ReturnType<typeof adminClient>>, short: { variantId: string; needed: number; available: number }[]) {
+  const ids = short.map((s) => s.variantId);
+  const [{ data: direct }, { data: shared }] = await Promise.all([
+    admin.from("product_stock").select("loyverse_variant_id,size,products(name)").in("loyverse_variant_id", ids),
+    admin.from("shared_stock_links").select("loyverse_variant_id").in("loyverse_variant_id", ids),
+  ]);
+  return short.map((s) => {
+    const r = direct?.find((d) => d.loyverse_variant_id === s.variantId) as { size: string; products: { name: string } | null } | undefined;
+    const pooled = shared?.some((x) => x.loyverse_variant_id === s.variantId);
+    const item = pooled ? "Shared sticker pool" : `${r?.products?.name ?? "Item"}${r?.size ? ` (Size ${r.size})` : ""}`;
+    return { item, needed: s.needed, available: Math.max(0, s.available) };
+  });
+}
+
+/** Record-only: mark a legacy order's stock as restored/deducted after fixing Loyverse by hand. Never touches Loyverse. */
+export const markOrderStock = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid(), stock_status: z.enum(["restored", "deducted"]) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const admin = await adminClient(context as unknown as Ctx);
+    const now = new Date().toISOString();
+    const { data: rows, error } = await admin.from("orders").update(data.stock_status === "restored" ? { stock_status: "restored", stock_restored_at: now } : { stock_status: "deducted", stock_deducted_at: now })
+      .eq("id", data.id).eq("stock_status", "unknown").select("id");
+    if (error) throw new Error(error.message);
+    if (!rows?.length) throw new Error("Only orders marked 'Check manually' can be updated this way.");
     return { ok: true };
   });
 

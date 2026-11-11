@@ -136,6 +136,10 @@ export type Database = {
           shipping_fee: number
           status: string
           sticker_bundle_discount: number
+          stock_deducted_at: string | null
+          stock_deductions: Json
+          stock_restored_at: string | null
+          stock_status: string
           stripe_payment_intent_id: string | null
           stripe_session_id: string | null
           subtotal: number
@@ -161,6 +165,10 @@ export type Database = {
           shipping_fee: number
           status?: string
           sticker_bundle_discount?: number
+          stock_deducted_at?: string | null
+          stock_deductions?: Json
+          stock_restored_at?: string | null
+          stock_status?: string
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           subtotal: number
@@ -186,6 +194,10 @@ export type Database = {
           shipping_fee?: number
           status?: string
           sticker_bundle_discount?: number
+          stock_deducted_at?: string | null
+          stock_deductions?: Json
+          stock_restored_at?: string | null
+          stock_status?: string
           stripe_payment_intent_id?: string | null
           stripe_session_id?: string | null
           subtotal?: number
