@@ -235,15 +235,20 @@ function Checkout() {
             <div className="flex justify-between gap-3"><dt>{weight.complete ? "Parcel weight" : "Known parcel weight"}</dt><dd className="text-right">{formatParcelWeight(weight)}</dd></div>
             {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
             <div className="flex justify-between"><dt>Shipping</dt><dd>{ship == null ? "Quote required" : ship === 0 ? "Free" : money(ship)}</dd></div>
-            {thaiShipping && thaiShipping.blocks > 0 && <>
-              <div className="flex justify-between gap-3 text-muted-foreground"><dt>Tumbler weight</dt><dd className="text-right">{formatParcelWeight(thaiShipping.weight)}</dd></div>
-              <div className="flex justify-between gap-3 text-muted-foreground"><dt>Base shipping (first 1kg)</dt><dd>{money(thaiShipping.base)}</dd></div>
-              {thaiShipping.surcharge > 0 && <div className="flex justify-between gap-3 text-muted-foreground"><dt>Extra weight ({thaiShipping.blocks - 1} × 1kg tier)</dt><dd>{money(thaiShipping.surcharge)}</dd></div>}
-            </>}
-            {country === "Malaysia" && malaysiaShipping.groups.filter((g) => g.units > 0).map((g) => (
-              <div key={g.label} className="flex justify-between gap-3 text-muted-foreground"><dt>{g.label}: {g.units} {g.units === 1 ? "unit" : "units"} · {g.blocks} {g.blocks === 1 ? "block" : "blocks"} of {g.size}</dt><dd className="shrink-0">{money(g.fee)}</dd></div>
-            ))}
-            {country === "Malaysia" && surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
+            {((thaiShipping && thaiShipping.blocks > 0) || (country === "Malaysia" && (malaysiaShipping.groups.some((g) => g.units > 0) || surcharge > 0))) && (
+              <div className="ml-2 space-y-1 rounded-r-md border-l-2 border-muted-foreground/30 bg-muted/20 px-2.5 py-2 text-xs text-muted-foreground">
+                <p className="font-medium">↳ {country} shipping breakdown (included above)</p>
+                {thaiShipping && thaiShipping.blocks > 0 && <>
+                  <div className="flex justify-between gap-3"><dt>Tumbler weight</dt><dd className="text-right">{formatParcelWeight(thaiShipping.weight)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt>Base tier (first 1kg)</dt><dd>{money(thaiShipping.base)}</dd></div>
+                  {thaiShipping.surcharge > 0 && <div className="flex justify-between gap-3"><dt>Extra weight ({thaiShipping.blocks - 1} × 1kg tier)</dt><dd>{money(thaiShipping.surcharge)}</dd></div>}
+                </>}
+                {country === "Malaysia" && malaysiaShipping.groups.filter((g) => g.units > 0).map((g) => (
+                  <div key={g.label} className="flex justify-between gap-3"><dt>{g.label}: {g.units} {g.units === 1 ? "unit" : "units"} ({g.blocks} {g.blocks === 1 ? "block" : "blocks"} of {g.size})</dt><dd className="shrink-0">{money(g.fee)}</dd></div>
+                ))}
+                {country === "Malaysia" && surcharge > 0 && <div className="flex justify-between gap-3"><dt>Sabah &amp; Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
+              </div>
+            )}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
           </dl>
           {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
