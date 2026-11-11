@@ -127,6 +127,13 @@
       "when": 1794282776590,
       "tag": "0017_product_images_admin_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794385607782,
+      "tag": "0018_order_stock_tracking",
+      "breakpoints": true
     }
   ]
 }
