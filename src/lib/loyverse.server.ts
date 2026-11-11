@@ -44,14 +44,24 @@ export async function pullStock(admin: Admin) {
   return ids.length;
 }
 
-/** Deduct sold quantities in Loyverse after a web order. */
-export async function pushSale(admin: Admin, sold: { variantId: string; quantity: number }[]) {
-  if (!sold.length) return;
+export type StockDelta = { variantId: string; quantity: number };
+export type Shortfall = { variantId: string; needed: number; available: number };
+
+export async function findShortfall(sold: StockDelta[]): Promise<Shortfall[]> {
+  if (!sold.length) return [];
   const levels = await fetchLevels(sold.map((s) => s.variantId));
-  const updates = sold.map((s) => {
+  return sold.map((s) => ({ variantId: s.variantId, needed: s.quantity, available: levels.filter((l) => l.variant_id === s.variantId).reduce((n, l) => n + l.in_stock, 0) }))
+    .filter((x) => x.available < x.needed);
+}
+
+/** Apply signed deltas (negative = deduct, positive = restore) on top of fresh live Loyverse levels. */
+export async function adjustStock(admin: Admin, deltas: StockDelta[], sign: 1 | -1) {
+  if (!deltas.length) return;
+  const levels = await fetchLevels(deltas.map((s) => s.variantId));
+  const updates = deltas.map((s) => {
     const l = levels.find((x) => x.variant_id === s.variantId);
     if (!l) throw new Error(`No Loyverse stock record for ${s.variantId}`);
-    return { variant_id: s.variantId, store_id: l.store_id, stock_after: l.in_stock - s.quantity };
+    return { variant_id: s.variantId, store_id: l.store_id, stock_after: l.in_stock + sign * s.quantity };
   });
   const r = await fetch(`${API}/inventory`, { method: "POST", headers: headers(), body: JSON.stringify({ inventory_levels: updates }) });
   if (!r.ok) throw new Error(`Loyverse inventory update failed [${r.status}]: ${await r.text()}`);

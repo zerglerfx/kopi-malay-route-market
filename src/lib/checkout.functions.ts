@@ -165,7 +165,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
         sticker_bundle_discount: bundle.discount,
         parcel_weight_kg: weight.kg, parcel_weight_complete: weight.complete,
-        status: "pending_verification", payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,
+        status: "pending_verification", stock_status: "not_deducted", stock_deductions: sold, payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,
       }).select("id, order_number").single();
       if (o) order = o;
       else if (oErr && oErr.code !== "23505") throw new Error("Could not save your order. Please try again.");
@@ -183,10 +183,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     if (itemsError) throw new Error("Could not save your order items. Please try again.");
     if (userId) await supabaseAdmin.from("cart_items").delete().eq("user_id", userId);
 
-    if (loyverse) {
-      try { await loyverse.pushSale(supabaseAdmin, sold); }
-      catch (e) { console.error(`Loyverse deduction failed for ${order.order_number}`, e); }
-    }
+    // Stock is deducted only when an admin verifies payment (see updateOrder).
 
     try {
       const { data: signed } = await supabaseAdmin.storage.from("payment-receipts").createSignedUrl(path, 60 * 60 * 24 * 7);
