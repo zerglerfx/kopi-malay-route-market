@@ -130,17 +130,27 @@ export function thailandTumblerShipping(lines: ShippingLine[]) {
   const surcharge = Math.max(0, blocks - 1) * 60;
   return { weight, blocks, base, surcharge, total: base + surcharge };
 }
-export function shippingFee(country: Country, lines: ShippingLine[], state = ""): number | null {
-  if (country === "Thailand") {
-    return thailandTumblerShipping(lines)?.total ?? null;
-  }
+/** Malaysia quantity-block breakdown; shippingFee sums exactly these groups so displayed lines match the total. */
+export function malaysiaShippingBreakdown(lines: ShippingLine[], state = "") {
   let tumblers = 0, apparel = 0, accessories = 0;
   for (const line of lines) {
     if (line.category_slug === "tumblers") tumblers += line.quantity;
     else if (["jerseys-t-shirts", "shirts", "sweaters-jackets"].includes(line.category_slug)) apparel += line.quantity;
     else accessories += line.quantity;
   }
-  return 20 * (Math.ceil(tumblers / 2) + Math.ceil(apparel / 2) + Math.ceil(accessories / 20)) + eastMalaysiaSurcharge(country, state);
+  const group = (label: string, units: number, size: number) => {
+    const blocks = Math.ceil(units / size);
+    return { label, units, size, blocks, fee: 20 * blocks };
+  };
+  const groups = [group("Tumblers", tumblers, 2), group("Apparel", apparel, 2), group("Accessories", accessories, 20)];
+  const surcharge = eastMalaysiaSurcharge("Malaysia", state);
+  return { groups, surcharge, total: groups.reduce((sum, g) => sum + g.fee, 0) + surcharge };
+}
+export function shippingFee(country: Country, lines: ShippingLine[], state = ""): number | null {
+  if (country === "Thailand") {
+    return thailandTumblerShipping(lines)?.total ?? null;
+  }
+  return malaysiaShippingBreakdown(lines, state).total;
 }
 export function destinationPrice(p: Product, country: Country): number | null {
   return country === "Thailand" ? effectivePriceThb(p) : effectivePrice(p);

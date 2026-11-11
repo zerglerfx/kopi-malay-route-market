@@ -12,7 +12,7 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, thailandTumblerShipping, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country } from "@/lib/shop";
 import { stickerBundle } from "@/lib/sticker-bundle";
 
 export const Route = createFileRoute("/checkout/")({
@@ -73,6 +73,7 @@ function Checkout() {
   const shippingLines = lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null }));
   const weight = parcelWeight(shippingLines);
   const ship = shippingFee(country, shippingLines, f.state);
+  const malaysiaShipping = malaysiaShippingBreakdown(shippingLines, f.state);
   const thaiShipping = country === "Thailand" ? thailandTumblerShipping(shippingLines) : null;
   const surcharge = eastMalaysiaSurcharge(country, f.state);
   const checkPromo = useServerFn(validatePromoCode);
@@ -239,7 +240,10 @@ function Checkout() {
               <div className="flex justify-between gap-3 text-muted-foreground"><dt>Base shipping (first 1kg)</dt><dd>{money(thaiShipping.base)}</dd></div>
               {thaiShipping.surcharge > 0 && <div className="flex justify-between gap-3 text-muted-foreground"><dt>Extra weight ({thaiShipping.blocks - 1} × 1kg tier)</dt><dd>{money(thaiShipping.surcharge)}</dd></div>}
             </>}
-            {surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
+            {country === "Malaysia" && malaysiaShipping.groups.filter((g) => g.units > 0).map((g) => (
+              <div key={g.label} className="flex justify-between gap-3 text-muted-foreground"><dt>{g.label}: {g.units} {g.units === 1 ? "unit" : "units"} · {g.blocks} {g.blocks === 1 ? "block" : "blocks"} of {g.size}</dt><dd className="shrink-0">{money(g.fee)}</dd></div>
+            ))}
+            {country === "Malaysia" && surcharge > 0 && <div className="flex justify-between text-muted-foreground"><dt>Includes Sabah / Sarawak surcharge</dt><dd>{money(surcharge)}</dd></div>}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
           </dl>
           {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
@@ -247,7 +251,7 @@ function Checkout() {
           <Button type="submit" disabled={busy || promoBusy || unavailable || ship == null} className="mt-5 h-auto w-full py-3 font-display font-semibold uppercase">
             {busy ? "Submitting…" : "Confirm Order & Submit Receipt"}
           </Button>
-          <p className="mt-2 text-center text-xs text-muted-foreground">Thailand: apparel and accessories free; tumblers THB 60 per started kilogram. Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order.</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">{country === "Thailand" ? "Thailand: apparel and accessories free; tumblers THB 60 per started kilogram." : "Malaysia: RM 20 per 2 tumblers, RM 20 per 2 apparel items, and RM 20 per 20 accessories. Each group is charged separately. Sabah & Sarawak: add RM 10 per order."}</p>
         </aside>
       </form>
     </div>
