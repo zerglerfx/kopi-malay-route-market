@@ -12,7 +12,7 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, thailandTumblerShipping, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country } from "@/lib/shop";
 import { stickerBundle } from "@/lib/sticker-bundle";
 
 export const Route = createFileRoute("/checkout/")({
