@@ -94,10 +94,10 @@ function OrdersAdmin() {
                     <div className="font-medium">{o.currency.toUpperCase()} {o.total_amount.toFixed(2)}</div>
                     <div className="text-xs text-muted-foreground">{o.payment_method}{o.promo_code ? ` · ${o.promo_code}` : ""}</div>
                     {o.receipt_url ? <a href={o.receipt_url} target="_blank" rel="noreferrer" className="text-xs font-medium underline">View receipt</a> : <span className="text-xs text-muted-foreground">No receipt</span>}
-                    <div className="mt-1 flex gap-1">
+                    {o.status !== "verified" && o.status !== "rejected" && o.status !== "shipped" && o.status !== "completed" && <div className="mt-1 flex gap-1">
                       <button onClick={() => patch(o.id, { status: "verified" })} className="rounded border px-2 py-0.5 text-xs hover:bg-muted">Verify</button>
                       <button onClick={() => patch(o.id, { status: "rejected" })} className="rounded border px-2 py-0.5 text-xs hover:bg-muted">Reject</button>
-                    </div>
+                    </div>}
                   </td>
                   <td className="max-w-[260px] px-3 py-2">{itemsText(o.items)}</td>
                   <td className="w-[300px] px-3 py-2">
