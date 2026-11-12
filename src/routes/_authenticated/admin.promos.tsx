@@ -8,10 +8,10 @@ import { listPromos, savePromo } from "@/lib/admin.functions";
 export const Route = createFileRoute("/_authenticated/admin/promos")({ component: PromosAdmin });
 
 type Draft = {
-  id?: string; code: string; discount_type: "percentage" | "fixed_amount"; discount_value: string; discount_myr: string; discount_thb: string;
+  id?: string; code: string; discount_type: "percentage" | "fixed_amount"; discount_value: string; discount_myr: string; discount_thb: string; receipt_discount_thb: string;
   min_order_myr: string; min_order_thb: string; max_uses: string; is_active: boolean; expires_at: string;
 };
-const EMPTY: Draft = { code: "", discount_type: "percentage", discount_value: "", discount_myr: "", discount_thb: "", min_order_myr: "", min_order_thb: "", max_uses: "", is_active: true, expires_at: "" };
+const EMPTY: Draft = { code: "", discount_type: "percentage", discount_value: "", discount_myr: "", discount_thb: "", receipt_discount_thb: "", min_order_myr: "", min_order_thb: "", max_uses: "", is_active: true, expires_at: "" };
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 const str = (n: unknown) => (n == null ? "" : String(n));
 const input = "w-full rounded border bg-card px-2 py-1.5 text-sm";
@@ -27,11 +27,12 @@ function PromosAdmin() {
     e.preventDefault();
     if (!d) return;
     const fixed = d.discount_type === "fixed_amount";
+    if (d.receipt_discount_thb.trim() !== "" && !/^\d+(\.\d{1,2})?$/.test(d.receipt_discount_thb.trim())) { toast.error("THB off on receipt: numbers only, zero or more, up to two decimals"); return; }
     try {
       await save({ data: {
         id: d.id, code: d.code, discount_type: d.discount_type,
         discount_value: fixed ? Number(d.discount_myr || 0) : Number(d.discount_value || 0),
-        discount_myr: fixed ? num(d.discount_myr) : null, discount_thb: fixed ? num(d.discount_thb) : null,
+        discount_myr: fixed ? num(d.discount_myr) : null, discount_thb: fixed ? num(d.discount_thb) : null, receipt_discount_thb: num(d.receipt_discount_thb),
         min_order_myr: num(d.min_order_myr), min_order_thb: num(d.min_order_thb), max_uses: num(d.max_uses),
         is_active: d.is_active, expires_at: d.expires_at ? new Date(d.expires_at).toISOString() : null,
       } });
@@ -48,9 +49,11 @@ function PromosAdmin() {
           <label className="text-sm">Code<input required className={input} value={d.code} onChange={(e) => setD({ ...d, code: e.target.value.toUpperCase() })} /></label>
           <label className="text-sm">Type<select className={input} value={d.discount_type} onChange={(e) => setD({ ...d, discount_type: e.target.value as Draft["discount_type"] })}><option value="percentage">Percentage %</option><option value="fixed_amount">Fixed amount</option></select></label>
           {d.discount_type === "percentage"
-            ? <label className="text-sm">Percent off<input required type="number" min={1} max={100} className={input} value={d.discount_value} onChange={(e) => setD({ ...d, discount_value: e.target.value })} /></label>
+            ? <><label className="text-sm">Percent off<input required type="number" min={1} max={100} className={input} value={d.discount_value} onChange={(e) => setD({ ...d, discount_value: e.target.value })} /></label>
+                <label className="text-sm">THB off on receipt (RM orders)<input type="number" step="0.01" min={0} inputMode="decimal" className={input} value={d.receipt_discount_thb} onChange={(e) => setD({ ...d, receipt_discount_thb: e.target.value })} /><span className="mt-1 block text-xs text-muted-foreground">Used only on the POS receipt for RM orders. Does not change what customers see or pay.</span></label></>
             : <>
                 <label className="text-sm">RM off<input required type="number" step="0.01" min={0} className={input} value={d.discount_myr} onChange={(e) => setD({ ...d, discount_myr: e.target.value })} /></label>
+                <label className="text-sm">THB off on receipt (RM orders)<input type="number" step="0.01" min={0} inputMode="decimal" className={input} value={d.receipt_discount_thb} onChange={(e) => setD({ ...d, receipt_discount_thb: e.target.value })} /><span className="mt-1 block text-xs text-muted-foreground">Used only on the POS receipt for RM orders. Does not change what customers see or pay.</span></label>
                 <label className="text-sm">THB off<input required type="number" step="0.01" min={0} className={input} value={d.discount_thb} onChange={(e) => setD({ ...d, discount_thb: e.target.value })} /></label>
               </>}
           <label className="text-sm">Min order RM<input type="number" step="0.01" min={0} className={input} value={d.min_order_myr} onChange={(e) => setD({ ...d, min_order_myr: e.target.value })} /></label>
@@ -78,7 +81,7 @@ function PromosAdmin() {
                   <td className="px-3 py-2">{p.expires_at ? new Date(p.expires_at).toLocaleDateString() : "Never"}</td>
                   <td className="px-3 py-2">{p.is_active ? "Yes" : "No"}</td>
                   <td className="px-3 py-2"><button className="underline" onClick={() => setD({
-                    id: p.id, code: p.code, discount_type: p.discount_type, discount_value: str(p.discount_value), discount_myr: str(p.discount_myr), discount_thb: str(p.discount_thb),
+                    id: p.id, code: p.code, discount_type: p.discount_type, discount_value: str(p.discount_value), discount_myr: str(p.discount_myr), discount_thb: str(p.discount_thb), receipt_discount_thb: str(p.receipt_discount_thb),
                     min_order_myr: str(p.min_order_myr), min_order_thb: str(p.min_order_thb), max_uses: str(p.max_uses), is_active: p.is_active, expires_at: p.expires_at?.slice(0, 10) ?? "",
                   })}>Edit</button></td>
                 </tr>

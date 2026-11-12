@@ -148,6 +148,13 @@
       "when": 1794491604178,
       "tag": "0020_pos_order_claim_recovery",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794521894358,
+      "tag": "0021_receipt_thb_overrides",
+      "breakpoints": true
     }
   ]
 }

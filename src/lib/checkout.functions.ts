@@ -7,7 +7,7 @@ import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
 import { aggregateStockSales } from "./stock";
 import { stickerBundle } from "./sticker-bundle";
-import { promoSnapshot, type PromoSnapshot } from "./pos-pricing";
+import { promoSnapshot, type PromoSnapshot, buildReceiptSnapshot, receiptUnitThb } from "./pos-pricing";
 
 const CheckoutInput = CheckoutDetails.extend({
   ref: z.string().regex(ORDER_REF_RE).optional(),
@@ -94,7 +94,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     if (!magicOk(bytes, data.receipt.type)) throw new Error("Receipt file looks invalid. Please upload a PNG, JPG or PDF.");
 
     const ids = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,sale_price_thb,weight_kg,variants,categories(slug)").eq("is_active", true).in("id", ids);
+    const { data: products, error } = await supabaseAdmin.from("products").select("id,name,price,sale_price,price_thb,sale_price_thb,receipt_thb_rm_sale,weight_kg,variants,categories(slug)").eq("is_active", true).in("id", ids);
     if (error) throw new Error(error.message);
 
     const lines = data.items.map((i) => {
@@ -104,7 +104,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       if (sizes.length && !sizes.includes(i.variant)) throw new Error(`Please choose a size for ${p.name}.`);
       if (data.country === "Thailand" && p.price_thb == null) throw new Error(`Thailand pricing is not available yet for ${p.name}.`);
       const unit = data.country === "Thailand" ? Number(effectivePriceThb({ price_thb: Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) })) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
-      return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "" };
+      return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "", receiptThb: receiptUnitThb({ name: p.name, category_slug: p.categories?.slug ?? "", sale_price: p.sale_price == null ? null : Number(p.sale_price), receipt_thb_rm_sale: p.receipt_thb_rm_sale == null ? null : Number(p.receipt_thb_rm_sale) }, unit, data.country === "Thailand" ? "thb" : "myr") };
     });
 
     // Stock check against live Loyverse levels for tracked items.
@@ -144,6 +144,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     let promoCode: string | null = null;
     let discount = 0;
     let savedPromo: PromoSnapshot | null = null;
+    let receiptPromoThb: number | null = null;
     if (data.promoCode) {
       const promo = await loadPromo(supabaseAdmin, data.promoCode);
       const r = computePromoDiscount(promo, subtotal - bundle.discount, currency);
@@ -154,6 +155,8 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       promoCode = promo.code.toUpperCase();
       discount = r.discount;
       savedPromo = promoSnapshot(promo);
+      const rp = (promo as { receipt_discount_thb?: unknown }).receipt_discount_thb;
+      receiptPromoThb = rp == null ? null : Number(rp);
     }
     const total = subtotal - bundle.discount - discount + ship;
     const token = crypto.randomUUID();
@@ -167,6 +170,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
         promo_snapshot: savedPromo,
+        pos_receipt_snapshot: buildReceiptSnapshot(currency, lines, receiptPromoThb),
         sticker_bundle_discount: bundle.discount,
         parcel_weight_kg: weight.kg, parcel_weight_complete: weight.complete,
         status: "pending_verification", stock_status: "not_deducted", stock_deductions: sold, payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,

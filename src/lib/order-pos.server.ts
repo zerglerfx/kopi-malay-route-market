@@ -1,6 +1,6 @@
 import type { Json } from "@/integrations/supabase/types";
 import { effectivePriceThb } from "./shop";
-import { posNote, pricedPosLines, promoSnapshot, resolvePosPromo, satang, type PromoSnapshot } from "./pos-pricing";
+import { posNote, pricedPosLines, promoSnapshot, resolvePosPromo, satang, snapshotUnitThb, type PosReceiptSnapshot, type PromoSnapshot } from "./pos-pricing";
 import * as lv from "./loyverse.server";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
@@ -43,7 +43,7 @@ async function ensureReceipt(admin: Admin, op: Operation, ref: string): Promise<
 }
 
 export async function processOrderPos(admin: Admin, input: { id: string; action: "deduct" | "restore"; actor: string; returnToStock?: boolean | undefined; promoThb?: number | undefined }): Promise<PosResult> {
-  const { data: order, error } = await admin.from("orders").select("id,order_number,status,currency,subtotal,shipping_fee,total_amount,discount_amount,sticker_bundle_discount,promo_code,promo_snapshot,stock_deductions,order_items(product_id,product_name,selected_variant,unit_price,quantity)").eq("id", input.id).single();
+  const { data: order, error } = await admin.from("orders").select("id,order_number,status,currency,subtotal,shipping_fee,total_amount,discount_amount,sticker_bundle_discount,promo_code,promo_snapshot,pos_receipt_snapshot,stock_deductions,order_items(product_id,product_name,selected_variant,unit_price,quantity)").eq("id", input.id).single();
   if (error || !order) throw new Error(error?.message ?? "Order not found");
   const { data: operations, error: historyError } = await admin.from("order_pos_operations").select("*").eq("order_id", input.id).order("cycle", { ascending: false }).order("created_at", { ascending: false });
   if (historyError) throw new Error(historyError.message);
@@ -73,14 +73,15 @@ export async function processOrderPos(admin: Admin, input: { id: string; action:
       order.promo_code ? admin.from("promo_codes").select("discount_type,discount_value,discount_myr,discount_thb").eq("code", order.promo_code).maybeSingle() : Promise.resolve({ data: null, error: null }),
     ]);
     if (productsResult.error || directResult.error || sharedResult.error || promoResult.error) throw new Error("Could not read catalog, stock links or promo values. No receipt created.");
+    const receiptSnap = order.pos_receipt_snapshot as unknown as PosReceiptSnapshot | null;
     const items = order.order_items.map((i) => {
       const p = productsResult.data?.find((x) => x.id === i.product_id);
       const shared = sharedResult.data?.find((x) => x.product_id === i.product_id);
       const link = shared ?? directResult.data?.find((x) => x.product_id === i.product_id && x.size === i.selected_variant);
-      return { variantId: link?.loyverse_variant_id ?? "", name: i.product_name, size: i.selected_variant, category_slug: p?.categories?.slug ?? "", quantity: i.quantity, priceThb: p ? effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) : null };
+      return { variantId: link?.loyverse_variant_id ?? "", name: i.product_name, size: i.selected_variant, category_slug: p?.categories?.slug ?? "", quantity: i.quantity, priceThb: snapshotUnitThb(receiptSnap, i.product_id, i.selected_variant) ?? (p ? effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) : null) };
     });
     const priced = pricedPosLines(items, 0);
-    const promo = resolvePosPromo({ currency: order.currency, rmBase: Number(order.subtotal) - Number(order.sticker_bundle_discount), paidDiscount: Number(order.discount_amount), thbBase: priced.base, hasPromo: !!order.promo_code || Number(order.discount_amount) > 0, snapshot: order.promo_snapshot as PromoSnapshot | null, current: promoResult.data ? promoSnapshot(promoResult.data) : null, confirmed: input.promoThb });
+    const promo = resolvePosPromo({ currency: order.currency, rmBase: Number(order.subtotal) - Number(order.sticker_bundle_discount), paidDiscount: Number(order.discount_amount), thbBase: priced.base, hasPromo: !!order.promo_code || Number(order.discount_amount) > 0, snapshot: order.promo_snapshot as PromoSnapshot | null, current: promoResult.data ? promoSnapshot(promoResult.data) : null, confirmed: input.promoThb, receiptPromoThb: receiptSnap?.promo_thb ?? null });
     if (promo.needsConfirmation) return { ok: false, promoConfirmation: { currency: order.currency, paidDiscount: Number(order.discount_amount), maxThb: priced.base } };
     const final = pricedPosLines(items, promo.discount);
     receiptDeltas = [];

@@ -1,3 +1,4 @@
+import { isPaperBundleSticker } from "@/lib/pos-pricing";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -13,7 +14,7 @@ export const Route = createFileRoute("/_authenticated/admin/products")({ compone
 
 type Data = Awaited<ReturnType<typeof listAdminProducts>>;
 type P = Data["products"][number];
-type Draft = { id?: string; name: string; slug: string; description: string; category_id: string; price: string; sale_price: string; price_thb: string; sale_price_thb: string; weight_kg: string; images: string; sizes: string; is_featured: boolean; is_new_arrival: boolean; is_active: boolean };
+type Draft = { id?: string; name: string; slug: string; description: string; category_id: string; price: string; sale_price: string; price_thb: string; sale_price_thb: string; receipt_thb_rm_sale: string; weight_kg: string; images: string; sizes: string; is_featured: boolean; is_new_arrival: boolean; is_active: boolean };
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 const str = (n: unknown) => (n == null ? "" : String(n));
 const input = "w-full rounded border bg-card px-2 py-1.5 text-sm";
@@ -52,17 +53,19 @@ function ProductsAdmin() {
   const refresh = () => { qc.invalidateQueries({ queryKey: ["admin", "products"] }); qc.invalidateQueries({ queryKey: ["products"] }); };
 
   const edit = (p?: P) => setD(p ? {
-    id: p.id, name: p.name, slug: p.slug, description: p.description, category_id: p.category_id, price: str(p.price), sale_price: str(p.sale_price), price_thb: str(p.price_thb), sale_price_thb: str(p.sale_price_thb),
+    id: p.id, name: p.name, slug: p.slug, description: p.description, category_id: p.category_id, price: str(p.price), sale_price: str(p.sale_price), price_thb: str(p.price_thb), sale_price_thb: str(p.sale_price_thb), receipt_thb_rm_sale: str(p.receipt_thb_rm_sale),
     weight_kg: str(p.weight_kg), images: p.images.join("\n"), sizes: p.sizes.join(", "), is_featured: p.is_featured, is_new_arrival: p.is_new_arrival, is_active: p.is_active,
-  } : { name: "", slug: "", description: "", category_id: data?.categories[0]?.id ?? "", price: "", sale_price: "", price_thb: "", sale_price_thb: "", weight_kg: "", images: "", sizes: "", is_featured: false, is_new_arrival: true, is_active: true });
+  } : { name: "", slug: "", description: "", category_id: data?.categories[0]?.id ?? "", price: "", sale_price: "", price_thb: "", sale_price_thb: "", receipt_thb_rm_sale: "", weight_kg: "", images: "", sizes: "", is_featured: false, is_new_arrival: true, is_active: true });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!d) return;
+    const paperSticker = isPaperBundleSticker({ name: d.name, category_slug: data?.categories.find((c) => c.id === d.category_id)?.slug ?? "" });
+    if (!paperSticker && d.receipt_thb_rm_sale.trim() !== "" && !/^\d+(\.\d{1,2})?$/.test(d.receipt_thb_rm_sale.trim())) { toast.error("THB on receipt: numbers only, zero or more, up to two decimals"); return; }
     try {
       await save({ data: {
         id: d.id, name: d.name, slug: d.slug || slugify(d.name), description: d.description, category_id: d.category_id,
-        price: Number(d.price), sale_price: num(d.sale_price), price_thb: num(d.price_thb), sale_price_thb: num(d.sale_price_thb), weight_kg: num(d.weight_kg),
+        price: Number(d.price), sale_price: num(d.sale_price), price_thb: num(d.price_thb), sale_price_thb: num(d.sale_price_thb), receipt_thb_rm_sale: paperSticker ? null : num(d.receipt_thb_rm_sale), weight_kg: num(d.weight_kg),
         images: d.images.split("\n").map((s) => s.trim()).filter(Boolean), sizes: d.sizes.split(",").map((s) => s.trim()).filter(Boolean),
         is_featured: d.is_featured, is_new_arrival: d.is_new_arrival, is_active: d.is_active,
       } });
@@ -101,6 +104,7 @@ function ProductsAdmin() {
           <label className="text-sm">Category<select className={input} value={d.category_id} onChange={(e) => setD({ ...d, category_id: e.target.value })}>{data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
           <label className="text-sm">Price RM<input required type="number" step="0.01" min={0} className={input} value={d.price} onChange={(e) => setD({ ...d, price: e.target.value })} /></label>
           <label className="text-sm">Sale price RM<input type="number" step="0.01" min={0} className={input} value={d.sale_price} onChange={(e) => setD({ ...d, sale_price: e.target.value })} /></label>
+          {!isPaperBundleSticker({ name: d.name, category_slug: data.categories.find((c) => c.id === d.category_id)?.slug ?? "" }) && <label className="text-sm">THB on receipt (RM sale)<input type="number" step="0.01" min={0} inputMode="decimal" className={input} value={d.receipt_thb_rm_sale} onChange={(e) => setD({ ...d, receipt_thb_rm_sale: e.target.value })} /><span className="mt-1 block text-xs text-muted-foreground">Used only on the POS receipt for RM orders. Does not change what customers see or pay.</span></label>}
           <label className="text-sm">Price THB<input type="number" step="0.01" min={0} className={input} value={d.price_thb} onChange={(e) => setD({ ...d, price_thb: e.target.value })} /></label>
           <label className="text-sm">Sale price THB<input type="number" step="0.01" min={0} className={input} value={d.sale_price_thb} onChange={(e) => setD({ ...d, sale_price_thb: e.target.value })} /></label>
           <label className="text-sm">Weight (kg)<input type="number" step="0.001" min={0} className={input} value={d.weight_kg} onChange={(e) => setD({ ...d, weight_kg: e.target.value })} /></label>

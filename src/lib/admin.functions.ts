@@ -192,6 +192,7 @@ const PromoSchema = z.object({
   discount_value: z.number().min(0).max(100000),
   discount_myr: z.number().min(0).nullable(),
   discount_thb: z.number().min(0).nullable(),
+  receipt_discount_thb: z.number().min(0).max(10000000).multipleOf(0.01).nullable().default(null),
   min_order_myr: z.number().min(0).nullable(),
   min_order_thb: z.number().min(0).nullable(),
   max_uses: z.number().int().min(1).nullable(),
@@ -225,6 +226,7 @@ const ProductSchema = z.object({
   sale_price: z.number().min(0).nullable(),
   price_thb: z.number().min(0).nullable(),
   sale_price_thb: z.number().min(0).nullable(),
+  receipt_thb_rm_sale: z.number().min(0).max(10000000).multipleOf(0.01).nullable().default(null),
   weight_kg: z.number().min(0).max(100).nullable(),
   images: z.array(z.string().trim().min(1)).max(12),
   sizes: z.array(z.string().trim().min(1)).max(12),
@@ -236,14 +238,14 @@ const ProductSchema = z.object({
 export const listAdminProducts = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
   const admin = await adminClient(context as unknown as Ctx);
   const [p, c, s, l] = await Promise.all([
-    admin.from("products").select("id,name,slug,description,category_id,price,sale_price,price_thb,sale_price_thb,weight_kg,images,variants,is_featured,is_new_arrival,is_active").order("created_at"),
+    admin.from("products").select("id,name,slug,description,category_id,price,sale_price,price_thb,sale_price_thb,receipt_thb_rm_sale,weight_kg,images,variants,is_featured,is_new_arrival,is_active").order("created_at"),
     admin.from("categories").select("id,name,slug").order("sort_order"),
     admin.from("product_stock").select("product_id,size,loyverse_variant_id,in_stock,synced_at"),
     admin.from("shared_stock_links").select("product_id,loyverse_variant_id"),
   ]);
   if (p.error) throw new Error(p.error.message);
   return {
-    products: (p.data ?? []).map((r) => ({ ...r, price: Number(r.price), sale_price: r.sale_price == null ? null : Number(r.sale_price), price_thb: r.price_thb == null ? null : Number(r.price_thb), sale_price_thb: r.sale_price_thb == null ? null : Number(r.sale_price_thb), weight_kg: r.weight_kg == null ? null : Number(r.weight_kg), sizes: ((r.variants ?? {}) as { sizes?: string[] }).sizes ?? [] })),
+    products: (p.data ?? []).map((r) => ({ ...r, price: Number(r.price), sale_price: r.sale_price == null ? null : Number(r.sale_price), price_thb: r.price_thb == null ? null : Number(r.price_thb), sale_price_thb: r.sale_price_thb == null ? null : Number(r.sale_price_thb), receipt_thb_rm_sale: r.receipt_thb_rm_sale == null ? null : Number(r.receipt_thb_rm_sale), weight_kg: r.weight_kg == null ? null : Number(r.weight_kg), sizes: ((r.variants ?? {}) as { sizes?: string[] }).sizes ?? [] })),
     categories: c.data ?? [],
     stock: (s.data ?? []).map((x) => ({ ...x, in_stock: Number(x.in_stock) })),
     shared: l.data ?? [],

@@ -200,6 +200,7 @@ export type Database = {
           payment_method: string
           pos_claim_id: string | null
           pos_claim_until: string | null
+          pos_receipt_snapshot: Json | null
           promo_code: string | null
           promo_snapshot: Json | null
           receipt_path: string | null
@@ -232,6 +233,7 @@ export type Database = {
           payment_method?: string
           pos_claim_id?: string | null
           pos_claim_until?: string | null
+          pos_receipt_snapshot?: Json | null
           promo_code?: string | null
           promo_snapshot?: Json | null
           receipt_path?: string | null
@@ -264,6 +266,7 @@ export type Database = {
           payment_method?: string
           pos_claim_id?: string | null
           pos_claim_until?: string | null
+          pos_receipt_snapshot?: Json | null
           promo_code?: string | null
           promo_snapshot?: Json | null
           receipt_path?: string | null
@@ -333,6 +336,7 @@ export type Database = {
           name: string
           price: number
           price_thb: number | null
+          receipt_thb_rm_sale: number | null
           sale_price: number | null
           sale_price_thb: number | null
           slug: string
@@ -352,6 +356,7 @@ export type Database = {
           name: string
           price: number
           price_thb?: number | null
+          receipt_thb_rm_sale?: number | null
           sale_price?: number | null
           sale_price_thb?: number | null
           slug: string
@@ -371,6 +376,7 @@ export type Database = {
           name?: string
           price?: number
           price_thb?: number | null
+          receipt_thb_rm_sale?: number | null
           sale_price?: number | null
           sale_price_thb?: number | null
           slug?: string
@@ -457,6 +463,7 @@ export type Database = {
           max_uses: number | null
           min_order_myr: number | null
           min_order_thb: number | null
+          receipt_discount_thb: number | null
         }
         Insert: {
           code: string
@@ -472,6 +479,7 @@ export type Database = {
           max_uses?: number | null
           min_order_myr?: number | null
           min_order_thb?: number | null
+          receipt_discount_thb?: number | null
         }
         Update: {
           code?: string
@@ -487,6 +495,7 @@ export type Database = {
           max_uses?: number | null
           min_order_myr?: number | null
           min_order_thb?: number | null
+          receipt_discount_thb?: number | null
         }
         Relationships: []
       }
