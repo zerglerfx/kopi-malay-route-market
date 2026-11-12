@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CSV_HEADERS, digits, ordersToCsv } from "@/lib/admin-csv";
+import { CSV_HEADERS, digits, filterOrders, ordersToCsv, phoneCell, statusOptions } from "@/lib/admin-csv";
 import { mergeWishlist, toggleWishlist } from "@/lib/wishlist";
 import { towingErrors } from "@/lib/towing";
 
@@ -43,5 +43,31 @@ describe("towing form", () => {
   });
   it("accepts a complete request", () => {
     expect(towingErrors({ name: "Ali", plate_number: "WXY1", motorcycle_model: "CB500X", phone: "+60123456789", breakdown_location: "KM 45 Route 1090", destination: "Tak workshop", pickup_lat: 16.8, pickup_lng: 99.1 })).toEqual({});
+  });
+});
+
+describe("order export phones and filters", () => {
+  it("keeps leading 0 and + as spreadsheet text", () => {
+    expect(phoneCell("0123658945")).toBe('"=""0123658945"""');
+    expect(phoneCell("+60123456789")).toBe('"=""+60123456789"""');
+  });
+  it("treats any other phone value as a guarded text cell", () => {
+    expect(phoneCell('+60"&HYPERLINK("x")')).toBe(`"'+60""&HYPERLINK(""x"")"`);
+    expect(phoneCell("012-345 6789")).toBe("012-345 6789");
+  });
+  it("adds statuses found on orders to the filter list", () => {
+    expect(statusOptions([{ status: "refunded" }])).toContain("refunded");
+    expect(statusOptions([])).toContain("pending");
+  });
+  it("filters by product, status, currency and date", () => {
+    expect(filterOrders([order], { q: "tumbler" })).toHaveLength(1);
+    expect(filterOrders([order], { status: "verified" })).toHaveLength(0);
+    expect(filterOrders([order], { currency: "thb" })).toHaveLength(0);
+    expect(filterOrders([order], { from: "2026-11-10" })).toHaveLength(0);
+    expect(filterOrders([order], { q: "345 6789" })).toHaveLength(1);
+  });
+  it("exports subtotal, bundle, promo, shipping and total columns", () => {
+    const csv = ordersToCsv([{ ...order, subtotal: 80, sticker_bundle_discount: 1.5, discount_amount: 3.5, promo_code: "KM10", shipping_fee: 20 }]);
+    expect(csv.split("\r\n")[1]).toContain("80.00,1.50,KM10,3.50,20.00,95.00,MYR");
   });
 });

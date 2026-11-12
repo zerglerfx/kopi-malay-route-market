@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { AdminOrderRow } from "./admin-csv";
+import { filterOrders, ordersToCsv, type AdminOrderRow } from "./admin-csv";
 import { TOWING_STATUSES } from "./towing";
 import { planStockAction, type StockStatus } from "./order-stock";
 type StockDelta = { variantId: string; quantity: number };
@@ -24,19 +24,36 @@ export const checkAdmin = createServerFn({ method: "GET" }).middleware([requireS
 });
 
 // ---------- Orders ----------
-export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; promo_code: string | null; stock_status: StockStatus };
+export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; sticker_bundle_discount: number; promo_code: string | null; stock_status: StockStatus };
+
+const FilterSchema = z.object({
+  q: z.string().max(200).optional(), status: z.string().max(50).optional(), currency: z.enum(["myr", "thb"]).optional(),
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+}).optional();
 
 export const listOrders = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }): Promise<AdminOrder[]> => {
   const admin = await adminClient(context as unknown as Ctx);
+  return loadOrders(admin);
+});
+
+/** Admin-only CSV of the orders matching the given filters (role re-checked on the server). */
+export const exportOrdersCsv = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => FilterSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const admin = await adminClient(context as unknown as Ctx);
+    return ordersToCsv(filterOrders(await loadOrders(admin), data ?? {}));
+  });
+
+async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promise<AdminOrder[]> {
   const { data, error } = await admin.from("orders")
-    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
+    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,sticker_bundle_discount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
     .order("created_at", { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
   const paths = (data ?? []).flatMap((o) => [o.receipt_path, o.tracking_label_path]).filter((p): p is string => !!p);
   const signed = paths.length ? (await admin.storage.from("payment-receipts").createSignedUrls(paths, 3600)).data ?? [] : [];
   return (data ?? []).map((o) => ({
     id: o.id, order_number: o.order_number, created_at: o.created_at, status: o.status, currency: o.currency,
-    total_amount: Number(o.total_amount), subtotal: Number(o.subtotal), shipping_fee: Number(o.shipping_fee), discount_amount: Number(o.discount_amount),
+    total_amount: Number(o.total_amount), subtotal: Number(o.subtotal), shipping_fee: Number(o.shipping_fee), discount_amount: Number(o.discount_amount), sticker_bundle_discount: Number(o.sticker_bundle_discount ?? 0),
     promo_code: o.promo_code, payment_method: o.payment_method, tracking_number: o.tracking_number, email: o.guest_email,
     address: (o.shipping_address ?? {}) as AdminOrderRow["address"],
     items: o.order_items ?? [],
@@ -44,7 +61,7 @@ export const listOrders = createServerFn({ method: "POST" }).middleware([require
     receipt_url: signed.find((s) => s.path === o.receipt_path)?.signedUrl ?? null,
     label_url: o.tracking_label_path ? signed.find((s) => s.path === o.tracking_label_path)?.signedUrl ?? null : null,
   }));
-});
+}
 
 const LABEL_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" } as const;
 
