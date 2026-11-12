@@ -5,6 +5,7 @@ import { filterOrders, ordersToCsv, type AdminOrderRow } from "./admin-csv";
 import { TOWING_STATUSES } from "./towing";
 import { planStockAction, type StockStatus } from "./order-stock";
 type StockDelta = { variantId: string; quantity: number };
+type UpdateResult = { ok: true } | { ok: false; shortfall: { item: string; needed: number; available: number }[] } | { ok: false; promoConfirmation: { paidDiscount: number; currency: string; maxThb: number } } | { ok: false; returnStockRequired: true };
 
 type Ctx = { supabase: { rpc: (fn: "has_role", args: { _user_id: string; _role: "admin" }) => PromiseLike<{ data: boolean | null }> }; userId: string };
 
@@ -49,6 +50,8 @@ async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promi
     .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,sticker_bundle_discount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
     .order("created_at", { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
+  const { data: posRows, error: posError } = await admin.from("order_pos_operations").select("order_id,cycle,kind,receipt_number,total_thb,promo_thb,confirmed_by,created_at").in("order_id", (data ?? []).map((o) => o.id)).order("cycle").order("created_at");
+  if (posError) throw new Error(posError.message);
   const paths = (data ?? []).flatMap((o) => [o.receipt_path, o.tracking_label_path]).filter((p): p is string => !!p);
   const signed = paths.length ? (await admin.storage.from("payment-receipts").createSignedUrls(paths, 3600)).data ?? [] : [];
   return (data ?? []).map((o) => ({
@@ -57,6 +60,7 @@ async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promi
     promo_code: o.promo_code, payment_method: o.payment_method, tracking_number: o.tracking_number, email: o.guest_email,
     address: (o.shipping_address ?? {}) as AdminOrderRow["address"],
     items: o.order_items ?? [],
+    pos_history: (posRows ?? []).filter((p) => p.order_id === o.id).map((p) => ({ cycle: p.cycle, kind: p.kind, receipt_number: p.receipt_number, total_thb: p.total_thb == null ? null : Number(p.total_thb), promo_thb: p.promo_thb == null ? null : Number(p.promo_thb), confirmed_by: p.confirmed_by, created_at: p.created_at })),
     stock_status: o.stock_status as StockStatus,
     receipt_url: signed.find((s) => s.path === o.receipt_path)?.signedUrl ?? null,
     label_url: o.tracking_label_path ? signed.find((s) => s.path === o.tracking_label_path)?.signedUrl ?? null : null,
@@ -97,42 +101,53 @@ export const updateOrder = createServerFn({ method: "POST" }).middleware([requir
     id: z.string().uuid(),
     status: z.enum(["pending", "paid", "pending_verification", "verified", "rejected", "shipped", "completed"]).optional(),
     tracking_number: z.string().trim().max(80).nullable().optional(),
+    return_to_stock: z.boolean().optional(),
+    promo_thb: z.number().min(0).max(10000000).multipleOf(0.01).optional(),
   }).parse(d))
-  .handler(async ({ data, context }): Promise<{ ok: true } | { ok: false; shortfall: { item: string; needed: number; available: number }[] }> => {
+  .handler(async ({ data, context }): Promise<UpdateResult> => {
     const admin = await adminClient(context as unknown as Ctx);
     const patch: { status?: string; tracking_number?: string | null } = {};
     if (data.tracking_number !== undefined) patch.tracking_number = data.tracking_number;
     if (data.status !== undefined) {
-      const { data: cur, error: e } = await admin.from("orders").select("stock_status,stock_deductions").eq("id", data.id).single();
+      const { data: cur, error: e } = await admin.from("orders").select("status,stock_status,stock_deductions,pos_claim_until").eq("id", data.id).single();
       if (e || !cur) throw new Error(e?.message ?? "Order not found");
-      const prev = cur.stock_status as StockStatus;
+      const busyExpired = ["deducting", "restoring"].includes(cur.stock_status) && cur.pos_claim_until && new Date(cur.pos_claim_until).getTime() < Date.now();
+      if (busyExpired && (cur.stock_status === "deducting" ? data.status !== "verified" : !["rejected", "pending", "pending_verification"].includes(data.status))) throw new Error("Retry the interrupted verification or reversal first.");
+      const prev = (busyExpired ? cur.stock_status === "deducting" ? "not_deducted" : "deducted" : cur.stock_status) as StockStatus;
+      if (["shipped", "completed"].includes(data.status) && !["verified", "shipped", "completed"].includes(cur.status)) throw new Error("Verify this order first before marking it shipped or completed.");
       const action = planStockAction(prev, data.status);
+      if (action === "none" && prev !== "unknown") {
+        const { data: unresolved, error: operationError } = await admin.from("order_pos_operations").select("kind,state,receipt_number,cycle").eq("order_id", data.id).order("cycle", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+        if (operationError) throw new Error(operationError.message);
+        const op = unresolved?.[0];
+        if (op && (["submitting", "uncertain", "receipt_saved"].includes(op.state) || (op.kind === "sale" && op.receipt_number && prev === "not_deducted"))) throw new Error("Finish reconciling the interrupted POS verification or refund before changing this status.");
+      }
       if (action !== "none") {
-        const deltas = (cur.stock_deductions ?? []) as StockDelta[];
+        let deltas = (cur.stock_deductions ?? []) as StockDelta[];
         // Atomic claim: only one request can move the order out of `prev`.
-        const { data: claimed } = await admin.from("orders").update({ stock_status: action === "deduct" ? "deducting" : "restoring" }).eq("id", data.id).eq("stock_status", prev).select("id");
-        if (!claimed?.length) throw new Error("This order's stock was just updated elsewhere. Refresh and try again.");
-        const revert = () => admin.from("orders").update({ stock_status: prev }).eq("id", data.id);
+        const claim = crypto.randomUUID();
+        const { data: claimed, error: claimError } = await admin.rpc("claim_order_pos", { _id: data.id, _prev: prev, _busy: action === "deduct" ? "deducting" : "restoring", _claim: claim });
+        if (claimError || !claimed) throw new Error(claimError?.message ?? "This order's stock was just updated elsewhere. Refresh and try again.");
+        const revert = () => admin.from("orders").update({ stock_status: prev, pos_claim_id: null, pos_claim_until: null }).eq("id", data.id).eq("pos_claim_id", claim);
         try {
-          const lv = await import("./loyverse.server");
-          if (action === "deduct") {
-            const short = await lv.findShortfall(deltas);
-            if (short.length) {
-              await revert();
-              return { ok: false, shortfall: await describeShortfall(admin, short) };
-            }
+          const { processOrderPos } = await import("./order-pos.server");
+          const result = await processOrderPos(admin, { id: data.id, action, actor: (context as unknown as Ctx).userId, returnToStock: data.return_to_stock, promoThb: data.promo_thb });
+          if (!result.ok) {
+            await revert();
+            if ("shortfall" in result) return { ok: false, shortfall: await describeShortfall(admin, result.shortfall) };
+            return result;
           }
-          await lv.adjustStock(admin, deltas, action === "deduct" ? -1 : 1);
+          deltas = result.deltas;
         } catch (err) {
           await revert();
           console.error("Loyverse stock update failed", err);
-          throw new Error(`Could not ${action === "deduct" ? "deduct" : "restore"} stock in Loyverse. Status not changed. Please try again.`);
+          throw new Error(err instanceof Error ? err.message : "Loyverse update failed. Status not changed.");
         }
         const now = new Date().toISOString();
         const { error } = await admin.from("orders").update(action === "deduct"
-          ? { ...patch, status: data.status, stock_status: "deducted", stock_deducted_at: now }
-          : { ...patch, status: data.status, stock_status: "restored", stock_restored_at: now }).eq("id", data.id);
-        if (error) throw new Error(error.message);
+          ? { ...patch, status: data.status, stock_status: "deducted", stock_deducted_at: now, stock_deductions: deltas, pos_claim_id: null, pos_claim_until: null }
+          : { ...patch, status: data.status, stock_status: "restored", stock_restored_at: now, pos_claim_id: null, pos_claim_until: null }).eq("id", data.id).eq("pos_claim_id", claim);
+        if (error) { await revert(); throw new Error(error.message); }
         return { ok: true };
       }
       patch.status = data.status;

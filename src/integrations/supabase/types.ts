@@ -118,6 +118,74 @@ export type Database = {
           },
         ]
       }
+      order_pos_operations: {
+        Row: {
+          completed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          cycle: number
+          error: string | null
+          id: string
+          kind: string
+          order_id: string
+          original_receipt_number: string | null
+          payload: Json
+          promo_thb: number | null
+          receipt_number: string | null
+          return_to_stock: boolean | null
+          state: string
+          total_thb: number | null
+          writeoff_state: string
+          writeoff_targets: Json | null
+        }
+        Insert: {
+          completed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          cycle: number
+          error?: string | null
+          id?: string
+          kind: string
+          order_id: string
+          original_receipt_number?: string | null
+          payload?: Json
+          promo_thb?: number | null
+          receipt_number?: string | null
+          return_to_stock?: boolean | null
+          state?: string
+          total_thb?: number | null
+          writeoff_state?: string
+          writeoff_targets?: Json | null
+        }
+        Update: {
+          completed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          cycle?: number
+          error?: string | null
+          id?: string
+          kind?: string
+          order_id?: string
+          original_receipt_number?: string | null
+          payload?: Json
+          promo_thb?: number | null
+          receipt_number?: string | null
+          return_to_stock?: boolean | null
+          state?: string
+          total_thb?: number | null
+          writeoff_state?: string
+          writeoff_targets?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_pos_operations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           access_token: string | null
@@ -130,7 +198,10 @@ export type Database = {
           parcel_weight_complete: boolean | null
           parcel_weight_kg: number | null
           payment_method: string
+          pos_claim_id: string | null
+          pos_claim_until: string | null
           promo_code: string | null
+          promo_snapshot: Json | null
           receipt_path: string | null
           shipping_address: Json
           shipping_fee: number
@@ -159,7 +230,10 @@ export type Database = {
           parcel_weight_complete?: boolean | null
           parcel_weight_kg?: number | null
           payment_method?: string
+          pos_claim_id?: string | null
+          pos_claim_until?: string | null
           promo_code?: string | null
+          promo_snapshot?: Json | null
           receipt_path?: string | null
           shipping_address?: Json
           shipping_fee: number
@@ -188,7 +262,10 @@ export type Database = {
           parcel_weight_complete?: boolean | null
           parcel_weight_kg?: number | null
           payment_method?: string
+          pos_claim_id?: string | null
+          pos_claim_until?: string | null
           promo_code?: string | null
+          promo_snapshot?: Json | null
           receipt_path?: string | null
           shipping_address?: Json
           shipping_fee?: number
@@ -543,6 +620,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_order_pos: {
+        Args: { _busy: string; _claim: string; _id: string; _prev: string }
+        Returns: boolean
+      }
       designated_google_admin_matches: {
         Args: {
           _confirmed_at: string

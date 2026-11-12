@@ -7,6 +7,7 @@ import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
 import { aggregateStockSales } from "./stock";
 import { stickerBundle } from "./sticker-bundle";
+import { promoSnapshot, type PromoSnapshot } from "./pos-pricing";
 
 const CheckoutInput = CheckoutDetails.extend({
   ref: z.string().regex(ORDER_REF_RE).optional(),
@@ -142,6 +143,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     const currency = data.country === "Thailand" ? "thb" : "myr";
     let promoCode: string | null = null;
     let discount = 0;
+    let savedPromo: PromoSnapshot | null = null;
     if (data.promoCode) {
       const promo = await loadPromo(supabaseAdmin, data.promoCode);
       const r = computePromoDiscount(promo, subtotal - bundle.discount, currency);
@@ -151,6 +153,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       if (!redeemed) throw new Error("Promo code: Invalid or expired promo code");
       promoCode = promo.code.toUpperCase();
       discount = r.discount;
+      savedPromo = promoSnapshot(promo);
     }
     const total = subtotal - bundle.discount - discount + ship;
     const token = crypto.randomUUID();
@@ -163,6 +166,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         order_number: ref, user_id: userId, guest_email: data.email, currency,
         shipping_address: { name: data.name, phone: data.phone, address: data.address, city: data.city, state: data.state, postcode: data.postcode, country: data.country },
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
+        promo_snapshot: savedPromo,
         sticker_bundle_discount: bundle.discount,
         parcel_weight_kg: weight.kg, parcel_weight_complete: weight.complete,
         status: "pending_verification", stock_status: "not_deducted", stock_deductions: sold, payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,

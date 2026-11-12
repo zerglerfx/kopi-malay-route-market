@@ -1,5 +1,5 @@
 # Major update (Nov 9)
-- [ ] Loyverse sale/refund receipts on Verify/reversal, exact THB merchandise pricing, retry reconciliation, stock-return decision after shipment, and Orders search/details/CSV receipt numbers. Confirm reversal/re-verification and missing catalog mappings before implementation.
+- [x] Loyverse per-cycle sale/refund receipts, exact THB merchandise pricing, durable retry reconciliation, post-shipment return/write-off decision, audited promo confirmation and additive checkout snapshot; Orders receipt history/search/CSV. Authenticated details/export and mocked receipt flows verified; no live sale/refund or inventory adjustment made.
 - [x] Monochrome theme, taller header with logos only, Shop/Services dropdowns, member marquee, New Arrival slider.
 - [x] Google + email sign-in, guest checkout note, wishlist (device + account merge).
 - [x] Towing & Rescue page with map pin and Telegram alert. Map unverified in sandbox; managed map key doesn't work on kopimalay.shop (needs own Google key).

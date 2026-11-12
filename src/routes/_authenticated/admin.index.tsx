@@ -9,8 +9,9 @@ import { exportOrdersCsv, listOrders, markOrderStock, setTrackingLabel, updateOr
 import { STOCK_LABEL } from "@/lib/order-stock";
 import { filterOrders, fullAddress, itemsText, money, orderTotals, statusOptions, type AdminOrderRow, type OrderFilters } from "@/lib/admin-csv";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/_authenticated/admin/")({ component: OrdersAdmin });
+export const Route = createFileRoute("/_authenticated/admin/")({ component: OrdersAdmin, head: () => ({ meta: [{ title: "Orders | Kopi Malay Admin" }, { name: "description", content: "Manage Kopi Malay website orders and POS receipt history." }, { property: "og:title", content: "Orders | Kopi Malay Admin" }, { property: "og:description", content: "Manage Kopi Malay website orders and POS receipt history." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }) });
 
 const STATUS = ["pending_verification", "verified", "rejected", "shipped", "completed", "pending", "paid"] as const;
 const label = (s: string) => s.replace(/_/g, " ");
@@ -28,6 +29,10 @@ function OrdersAdmin() {
   const [qr, setQr] = useState<AdminOrder | null>(null);
   const [labelOrder, setLabelOrder] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [returnChoice, setReturnChoice] = useState<{ id: string; status: (typeof STATUS)[number] } | null>(null);
+  const [promoChoice, setPromoChoice] = useState<{ id: string; paidDiscount: number; currency: string; maxThb: number } | null>(null);
+  const [promoValue, setPromoValue] = useState("");
   const saveLabel = useServerFn(setTrackingLabel);
   const markStock = useServerFn(markOrderStock);
   const [shortfall, setShortfall] = useState<{ item: string; needed: number; available: number }[] | null>(null);
@@ -53,13 +58,18 @@ function OrdersAdmin() {
   const rows = useMemo(() => filterOrders(data, filters), [data, filters]);
   const statuses = useMemo(() => statusOptions(data), [data]);
 
-  const patch = async (id: string, p: { status?: (typeof STATUS)[number]; tracking_number?: string | null }) => {
+  const patch = async (id: string, p: { status?: (typeof STATUS)[number]; tracking_number?: string | null; return_to_stock?: boolean; promo_thb?: number }) => {
+    if (updating) return;
+    setUpdating(id);
     try {
       const r = await save({ data: { id, ...p } });
-      if (!r.ok) setShortfall(r.shortfall);
-      else toast.success("Order updated");
+      if (!r.ok) {
+        if ("shortfall" in r) setShortfall(r.shortfall);
+        else if ("promoConfirmation" in r) { setPromoValue(""); setPromoChoice({ id, ...r.promoConfirmation }); }
+        else if ("returnStockRequired" in r && p.status) setReturnChoice({ id, status: p.status });
+      } else { setReturnChoice(null); setPromoChoice(null); toast.success("Order updated"); }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
-    finally { void qc.invalidateQueries({ queryKey: ["admin", "orders"] }); }
+    finally { setUpdating(null); void qc.invalidateQueries({ queryKey: ["admin", "orders"] }); }
   };
 
   const exportCsv = async () => {
@@ -80,7 +90,7 @@ function OrdersAdmin() {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
-        <input value={filters.q ?? ""} onChange={(e) => setF("q", e.target.value)} placeholder="Search ref, name, email, phone, product…" aria-label="Search orders" className="w-full max-w-xs rounded-md border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring" />
+        <input value={filters.q ?? ""} onChange={(e) => setF("q", e.target.value)} placeholder="Search order/POS ref, name, phone, product…" aria-label="Search orders" className="w-full max-w-xs rounded-md border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring" />
         <select aria-label="Status filter" value={filters.status ?? ""} onChange={(e) => setF("status", e.target.value)} className="rounded-md border bg-card px-2 py-2 text-sm capitalize">
           <option value="">All statuses</option>
           {statuses.map((s) => <option key={s} value={s}>{label(s)}</option>)}
@@ -109,11 +119,12 @@ function OrdersAdmin() {
                   <td className="whitespace-nowrap px-3 py-2">{o.address.phone}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium">{money(o.currency, o.total_amount)}</div>
+                    <PosNumbers o={o} />
                     <div className="text-xs text-muted-foreground">{o.payment_method}{o.promo_code ? ` · ${o.promo_code}` : ""}</div>
                     {o.receipt_url ? <a href={o.receipt_url} target="_blank" rel="noreferrer" className="text-xs font-medium underline">View receipt</a> : <span className="text-xs text-muted-foreground">No receipt</span>}
                     {o.status !== "verified" && o.status !== "rejected" && o.status !== "shipped" && o.status !== "completed" && <div className="mt-1 flex gap-1">
-                      <button onClick={() => patch(o.id, { status: "verified" })} className="rounded border px-2 py-0.5 text-xs hover:bg-muted">Verify</button>
-                      <button onClick={() => patch(o.id, { status: "rejected" })} className="rounded border px-2 py-0.5 text-xs hover:bg-muted">Reject</button>
+                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => void patch(o.id, { status: "verified" })}>Verify</Button>
+                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => void patch(o.id, { status: "rejected" })}>Reject</Button>
                     </div>}
                   </td>
                   <td className="max-w-[260px] px-3 py-2">{itemsText(o.items)}<button onClick={() => setDetails(o)} className="mt-1 block text-xs font-medium underline">View details</button></td>
@@ -142,7 +153,7 @@ function OrdersAdmin() {
                     <div className="mt-1 text-xs text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</div>
                   </td>
                   <td className="px-3 py-2">
-                    <select value={o.status} onChange={(e) => patch(o.id, { status: e.target.value as (typeof STATUS)[number] })} className="rounded border bg-card px-2 py-1 text-xs capitalize">
+                    <select disabled={!!updating} value={o.status} onChange={(e) => patch(o.id, { status: e.target.value as (typeof STATUS)[number] })} className="rounded border bg-card px-2 py-1 text-xs capitalize">
                       {STATUS.map((s) => <option key={s} value={s}>{label(s)}</option>)}
                     </select>
                     <div className={`mt-2 inline-block rounded border px-2 py-0.5 text-xs ${o.stock_status === "deducted" ? "bg-primary text-primary-foreground" : o.stock_status === "unknown" ? "border-dashed" : "text-muted-foreground"}`}>{STOCK_LABEL[o.stock_status]}</div>
@@ -155,6 +166,22 @@ function OrdersAdmin() {
           </table>
         </div>
       )}
+      <Dialog open={!!returnChoice} onOpenChange={(v) => !v && !updating && setReturnChoice(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Return items to stock?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">A linked POS refund will be created. If the items are not coming back, they will be written off after the refund.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={!!updating} onClick={() => returnChoice && void patch(returnChoice.id, { status: returnChoice.status, return_to_stock: true })}>Yes, return to stock</Button>
+            <Button variant="outline" disabled={!!updating} onClick={() => returnChoice && void patch(returnChoice.id, { status: returnChoice.status, return_to_stock: false })}>No, write off items</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!promoChoice} onOpenChange={(v) => !v && !updating && setPromoChoice(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Confirm THB promo discount</DialogTitle></DialogHeader>
+          {promoChoice && <><p className="text-sm">Customer received {money(promoChoice.currency, promoChoice.paidDiscount)} promo discount.</p><label className="space-y-1 text-sm"><span>THB discount (maximum {money("thb", promoChoice.maxThb)})</span><input aria-label="THB promo discount" type="number" min="0" max={promoChoice.maxThb} step="0.01" value={promoValue} onChange={(e) => setPromoValue(e.target.value)} className="w-full rounded border bg-card px-3 py-2" /></label><Button disabled={!!updating || !promoValue || !Number.isFinite(Number(promoValue)) || Number(promoValue) < 0 || Number(promoValue) > promoChoice.maxThb} onClick={() => void patch(promoChoice.id, { status: "verified", promo_thb: Number(promoValue) })}>Confirm discount and verify</Button></>}
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!qr} onOpenChange={(v) => !v && setQr(null)}>
         <DialogContent className="max-w-xs">
           <DialogHeader><DialogTitle>{qr?.order_number}</DialogTitle></DialogHeader>
@@ -182,6 +209,7 @@ function OrdersAdmin() {
             <div className="rounded-md border p-3"><Totals o={details} /></div>
             <div className="space-y-1">
               <div>Payment: {details.payment_method}</div>
+              <div className="space-y-1"><div className="font-semibold">POS receipt history</div>{details.pos_history?.filter((p) => p.receipt_number).map((p) => <div key={`${p.cycle}-${p.kind}`} className="border-b py-1 text-xs"><div className="flex flex-wrap justify-between gap-2"><span className="capitalize">{p.kind} {p.cycle} · <span className="font-mono">{p.receipt_number}</span></span><span>{money("thb", Number(p.total_thb ?? 0))}</span></div>{p.confirmed_by && <div className="break-all text-muted-foreground">THB promo {Number(p.promo_thb ?? 0).toFixed(2)} confirmed by admin {p.confirmed_by}</div>}</div>)}{!details.pos_history?.some((p) => p.receipt_number) && <span className="text-muted-foreground">—</span>}</div>
               {details.receipt_url ? <a href={details.receipt_url} target="_blank" rel="noreferrer" className="font-medium underline">View receipt</a> : <span className="text-muted-foreground">No receipt</span>}
               <div>Tracking no.: {details.tracking_number ?? "—"}</div>
               {details.label_url && <img src={details.label_url} alt={`Courier label for ${details.order_number}`} className="max-h-48 rounded border object-contain" />}
@@ -197,6 +225,13 @@ function OrdersAdmin() {
       </Dialog>
     </div>
   );
+}
+
+function PosNumbers({ o }: { o: AdminOrder }) {
+  const history = o.pos_history?.filter((p) => p.receipt_number) ?? [];
+  const sale = history.filter((p) => p.kind === "sale").at(-1);
+  const refund = history.filter((p) => p.kind === "refund").at(-1);
+  return <div className="my-1 space-y-0.5 text-xs"><div>POS sale: <span className="font-mono">{sale?.receipt_number ?? "—"}</span></div>{refund && <div>POS refund: <span className="font-mono">{refund.receipt_number}</span></div>}</div>;
 }
 
 function Totals({ o }: { o: AdminOrderRow }) {

@@ -134,6 +134,20 @@
       "when": 1794385607782,
       "tag": "0018_order_stock_tracking",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794491227155,
+      "tag": "0019_order_pos_receipt_cycles",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794491604178,
+      "tag": "0020_pos_order_claim_recovery",
+      "breakpoints": true
     }
   ]
 }

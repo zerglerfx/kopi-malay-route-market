@@ -68,3 +68,58 @@ export async function adjustStock(admin: Admin, deltas: StockDelta[], sign: 1 | 
   const now = new Date().toISOString();
   for (const u of updates) await admin.from("product_stock").update({ in_stock: Math.max(0, u.stock_after), synced_at: now }).eq("loyverse_variant_id", u.variant_id);
 }
+
+export type PosReceipt = { receipt_number: string; receipt_type: string; refund_for: string | null; order: string | null; total_money: number; line_items: { id: string; variant_id: string; quantity: number }[] };
+
+export async function posRequest<T>(path: string, body?: unknown): Promise<T> {
+  const r = await fetch(`${API}${path}`, { method: body === undefined ? "GET" : "POST", headers: headers(), ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: AbortSignal.timeout(25000) });
+  if (!r.ok) {
+    const detail = await r.text();
+    console.error(`Loyverse request failed [${r.status}]: ${detail}`);
+    throw new Error(`Loyverse rejected the request [${r.status}]: ${detail}`);
+  }
+  return await r.json() as T;
+}
+
+/** Exact order lookup, paginated. Source includes a durable cycle marker. Never match a partial web reference. */
+export async function findPosReceipt(ref: string, source: string, kind: "sale" | "refund", original?: string | null) {
+  let cursor: string | undefined;
+  const matches: PosReceipt[] = [];
+  do {
+    const q = new URLSearchParams({ order: ref, limit: "250" });
+    if (cursor) q.set("cursor", cursor);
+    const result = await posRequest<{ receipts: (PosReceipt & { source: string })[]; cursor?: string }>(`/receipts?${q}`);
+    matches.push(...result.receipts.filter((r) => r.order === ref && (kind === "sale" ? r.receipt_type === "SALE" && r.source === source : r.receipt_type === "REFUND" && r.refund_for === original)));
+    cursor = result.cursor;
+  } while (cursor);
+  if (matches.length > 1) throw new Error("Multiple matching POS receipts found. Check Loyverse before continuing.");
+  return matches[0] ?? null;
+}
+
+export async function posSettings() {
+  const [stores, payments, taxes] = await Promise.all([
+    posRequest<{ stores: { id: string; name: string; deleted_at: string | null }[] }>("/stores"),
+    posRequest<{ payment_types: { id: string; name: string; stores: string[]; deleted_at: string | null }[] }>("/payment_types"),
+    posRequest<{ taxes: { id: string; type: string; rate: number; stores: string[]; deleted_at: string | null }[] }>("/taxes"),
+  ]);
+  const store = stores.stores.find((s) => s.name === "KOPI MALAY" && !s.deleted_at);
+  const payment = payments.payment_types.find((p) => p.name === "MERCHANDISE QR (WEB)" && !p.deleted_at && store && p.stores.includes(store.id));
+  if (!store || !payment) throw new Error("KOPI MALAY store or MERCHANDISE QR (WEB) payment type is unavailable.");
+  // Only included VAT: never let an added tax increase discounted merchandise prices.
+  const vat = taxes.taxes.find((t) => t.type === "INCLUDED" && t.rate === 7 && !t.deleted_at && t.stores.includes(store.id));
+  if (!vat) throw new Error("The store's 7% included VAT is unavailable. Order not verified.");
+  return { storeId: store.id, paymentId: payment.id, taxes: [{ id: vat.id }] };
+}
+
+export async function writeoffTargets(deltas: StockDelta[], storeId: string) {
+  const levels = await fetchLevels(deltas.map((d) => d.variantId));
+  return deltas.map((d) => {
+    const level = levels.find((l) => l.variant_id === d.variantId && l.store_id === storeId);
+    if (!level) throw new Error("Missing store inventory for refunded item.");
+    return { variant_id: d.variantId, store_id: storeId, stock_after: level.in_stock - d.quantity };
+  });
+}
+
+export async function applyWriteoff(targets: { variant_id: string; store_id: string; stock_after: number }[]) {
+  await posRequest("/inventory", { inventory_levels: targets });
+}

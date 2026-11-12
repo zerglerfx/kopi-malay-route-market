@@ -14,11 +14,12 @@ export type AdminOrderRow = {
   email: string | null;
   address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string; country?: string };
   items: { product_name: string; selected_variant: string; quantity: number }[];
+  pos_history?: { cycle: number; kind: string; receipt_number: string | null; total_thb?: number | null; promo_thb?: number | null; confirmed_by?: string | null; created_at: string }[];
 };
 
 export const CSV_HEADERS = [
   "NO.", "Name", "Address", "Phone Number", "Email", "Order Ref", "Payment", "Status", "Items",
-  "Subtotal", "Bundle Savings", "Promo Code", "Promo Discount", "Shipping", "Total", "Currency", "Tracking No.", "Date",
+  "Subtotal", "Bundle Savings", "Promo Code", "Promo Discount", "Shipping", "Total", "Currency", "Tracking No.", "Date", "POS Receipt History",
 ];
 
 /** Statuses the app uses today; any other status found on orders is added automatically. */
@@ -55,7 +56,7 @@ export function filterOrders<T extends AdminOrderRow>(rows: T[], f: OrderFilters
     if (f.from && day < f.from) return false;
     if (f.to && day > f.to) return false;
     if (!q) return true;
-    const text = [o.order_number, o.address.name, o.email, ...o.items.map((i) => i.product_name)].filter(Boolean).join(" ").toLowerCase();
+    const text = [o.order_number, o.address.name, o.email, ...(o.pos_history ?? []).map((r) => r.receipt_number), ...o.items.map((i) => i.product_name)].filter(Boolean).join(" ").toLowerCase();
     if (text.includes(q)) return true;
     return qd.length >= 3 && digits(o.address.phone ?? "").includes(qd);
   });
@@ -85,6 +86,7 @@ export function ordersToCsv(rows: AdminOrderRow[]): string {
       cell(r.payment_method), cell(r.status), cell(itemsText(r.items)),
       cell(t.subtotal.toFixed(2)), cell(t.bundle.toFixed(2)), cell(t.promoCode ?? ""), cell(t.promo.toFixed(2)), cell(t.shipping.toFixed(2)), cell(t.total.toFixed(2)),
       cell(t.currency), cell(r.tracking_number), cell(r.created_at.slice(0, 10)),
+      cell((r.pos_history ?? []).filter((p) => p.receipt_number).map((p) => `${p.kind} ${p.cycle}: ${p.receipt_number}`).join("; ")),
     ].join(",");
   });
   return "\uFEFF" + [CSV_HEADERS.join(","), ...lines].join("\r\n");
