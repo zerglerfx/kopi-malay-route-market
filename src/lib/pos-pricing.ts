@@ -81,7 +81,7 @@ export function pricedPosLines(items: PosPricedItem[], promo: number) {
 
 export function posNote(o: { ref: string; cycle: number; currency: string; subtotal: number; sale?: number | undefined; bundle: number; promo: number; code: string | null; shipping: number; total: number; confirmedBy?: string | undefined; promoThb?: number | undefined }) {
   const c = o.currency.toLowerCase() === "myr" ? "RM" : "THB";
-  return [`${o.ref} · sale ${o.cycle}`, `Paid ${c} ${o.total.toFixed(2)}`, ...(o.sale ? [`Subtotal (regular) ${c} ${(o.subtotal + o.sale).toFixed(2)}`, `Sale: -${c} ${o.sale.toFixed(2)}`] : [`Subtotal ${c} ${o.subtotal.toFixed(2)}`]), `Bundle: -${c} ${o.bundle.toFixed(2)}`, `Promo ${o.code ?? "none"}: -${c} ${o.promo.toFixed(2)}`, `Shipping ${c} ${o.shipping.toFixed(2)} (not on receipt)`, ...(o.confirmedBy ? [`THB promo ${Number(o.promoThb).toFixed(2)} confirmed by admin ${o.confirmedBy}`] : [])].join("\n");
+  return [`${o.ref} · sale ${o.cycle}`, `Paid ${c} ${o.total.toFixed(2)}`, ...(o.sale ? [`Subtotal (regular) ${c} ${(o.subtotal + o.sale).toFixed(2)}`, `Sale: -${c} ${o.sale.toFixed(2)}`] : [`Subtotal ${c} ${o.subtotal.toFixed(2)}`]), `Bundle: -${c} ${o.bundle.toFixed(2)}`, `Promo ${o.code ?? "none"}: -${c} ${o.promo.toFixed(2)}`, `Shipping ${c} ${o.shipping.toFixed(2)} (not on receipt)`, ...(o.confirmedBy ? [`THB promo ${Number(o.promoThb).toFixed(2)} confirmed by admin ${o.confirmedBy}`] : [])].map((l, i) => i ? `• ${l}` : l).join("\n");
 }
 export type PosReceiptDiscount = { key: "sale" | "bundle" | "promo"; name: string; amount: number };
 /** Loyverse lines at regular THB unit prices plus receipt-level Sale/Bundle/Promo discounts (only those above zero). */
