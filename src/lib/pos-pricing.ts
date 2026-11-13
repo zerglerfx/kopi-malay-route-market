@@ -83,3 +83,21 @@ export function posNote(o: { ref: string; cycle: number; currency: string; subto
   const c = o.currency.toLowerCase() === "myr" ? "RM" : "THB";
   return [`${o.ref} · sale ${o.cycle}`, `Paid ${c} ${o.total.toFixed(2)}`, ...(o.sale ? [`Subtotal (regular) ${c} ${(o.subtotal + o.sale).toFixed(2)}`, `Sale: -${c} ${o.sale.toFixed(2)}`] : [`Subtotal ${c} ${o.subtotal.toFixed(2)}`]), `Bundle: -${c} ${o.bundle.toFixed(2)}`, `Promo ${o.code ?? "none"}: -${c} ${o.promo.toFixed(2)}`, `Shipping ${c} ${o.shipping.toFixed(2)} (not on receipt)`, ...(o.confirmedBy ? [`THB promo ${Number(o.promoThb).toFixed(2)} confirmed by admin ${o.confirmedBy}`] : [])].join("\n");
 }
+export type PosReceiptDiscount = { key: "sale" | "bundle" | "promo"; name: string; amount: number };
+/** Loyverse lines at regular THB unit prices plus receipt-level Sale/Bundle/Promo discounts (only those above zero). */
+export function posReceiptBreakdown(items: (PosPricedItem & { regularThb?: number | null })[], promo: number, code: string | null) {
+  const priced = pricedPosLines(items, promo);
+  const regular = items.map((it) => {
+    const r = it.locked || it.regularThb == null || !Number.isFinite(it.regularThb) ? Number(it.priceThb) : Math.max(Number(it.priceThb), it.regularThb);
+    return satang(r);
+  });
+  const sale = items.reduce((s, it, i) => s + ((regular[i] ?? 0) - satang(Number(it.priceThb))) * it.quantity, 0);
+  const lines = items.map((it, i) => ({ variant_id: it.variantId, line_note: `${it.name}${it.size ? ` (${it.size})` : ""}`, quantity: it.quantity, price: (regular[i] ?? 0) / 100, line_discounts: [] as { id: string }[], line_modifiers: [] as { modifier_option_id: string }[] }));
+  const discounts: PosReceiptDiscount[] = [
+    { key: "sale" as const, name: "WEB SALE", amount: sale / 100 },
+    { key: "bundle" as const, name: "WEB BUNDLE", amount: priced.bundle },
+    { key: "promo" as const, name: `PROMO ${(code ?? "WEB").toUpperCase()}`, amount: satang(promo) / 100 },
+  ].filter((d) => satang(d.amount) > 0);
+  const gross = regular.reduce((s, v, i) => s + v * (items[i]?.quantity ?? 0), 0);
+  return { lines, discounts, subtotal: gross / 100, total: (gross - discounts.reduce((s, d) => s + satang(d.amount), 0)) / 100 };
+}

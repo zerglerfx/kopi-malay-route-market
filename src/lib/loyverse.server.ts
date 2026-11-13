@@ -123,3 +123,15 @@ export async function writeoffTargets(deltas: StockDelta[], storeId: string) {
 export async function applyWriteoff(targets: { variant_id: string; store_id: string; stock_after: number }[]) {
   await posRequest("/inventory", { inventory_levels: targets });
 }
+
+/** Find or create store-scoped variable-amount discounts by name (receipt-level breakdown lines). */
+export async function posDiscountIds(storeId: string, names: string[]) {
+  if (!names.length) return {} as Record<string, string>;
+  const list = await posRequest<{ discounts: { id: string; name: string; type: string; stores: string[]; deleted_at: string | null }[] }>("/discounts");
+  const out: Record<string, string> = {};
+  for (const name of names) {
+    const found = list.discounts.find((d) => d.name === name && d.type === "VARIABLE_AMOUNT" && !d.deleted_at && d.stores.includes(storeId));
+    out[name] = found ? found.id : (await posRequest<{ id: string }>("/discounts", { type: "VARIABLE_AMOUNT", name, stores: [storeId] })).id;
+  }
+  return out;
+}

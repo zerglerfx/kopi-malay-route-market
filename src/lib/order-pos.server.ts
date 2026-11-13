@@ -1,6 +1,6 @@
 import type { Json } from "@/integrations/supabase/types";
 import { effectivePriceThb } from "./shop";
-import { posNote, pricedPosLines, promoSnapshot, resolvePosPromo, satang, snapshotUnitThb, type PosReceiptSnapshot, type PromoSnapshot } from "./pos-pricing";
+import { posNote, posReceiptBreakdown, pricedPosLines, promoSnapshot, resolvePosPromo, satang, snapshotUnitThb, type PosReceiptSnapshot, type PromoSnapshot } from "./pos-pricing";
 import * as lv from "./loyverse.server";
 
 type Admin = Awaited<typeof import("@/integrations/supabase/client.server")>["supabaseAdmin"];
@@ -79,7 +79,7 @@ export async function processOrderPos(admin: Admin, input: { id: string; action:
       const shared = sharedResult.data?.find((x) => x.product_id === i.product_id);
       const link = shared ?? directResult.data?.find((x) => x.product_id === i.product_id && x.size === i.selected_variant);
       const lockedThb = snapshotUnitThb(receiptSnap, i.product_id, i.selected_variant);
-      return { locked: lockedThb != null, variantId: link?.loyverse_variant_id ?? "", name: i.product_name, size: i.selected_variant, category_slug: p?.categories?.slug ?? "", quantity: i.quantity, priceThb: lockedThb ?? (p ? effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) : null) };
+      return { locked: lockedThb != null, variantId: link?.loyverse_variant_id ?? "", name: i.product_name, size: i.selected_variant, category_slug: p?.categories?.slug ?? "", quantity: i.quantity, priceThb: lockedThb ?? (p ? effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) : null), regularThb: p?.price_thb == null ? null : Number(p.price_thb) };
     });
     const priced = pricedPosLines(items, 0);
     const promo = resolvePosPromo({ currency: order.currency, rmBase: Number(order.subtotal) - Number(order.sticker_bundle_discount), paidDiscount: Number(order.discount_amount), thbBase: priced.promoBase, hasPromo: !!order.promo_code || Number(order.discount_amount) > 0, snapshot: order.promo_snapshot as PromoSnapshot | null, current: promoResult.data ? promoSnapshot(promoResult.data) : null, confirmed: input.promoThb, receiptPromoThb: receiptSnap?.promo_thb ?? null });
@@ -91,7 +91,10 @@ export async function processOrderPos(admin: Admin, input: { id: string; action:
       if (existing) existing.quantity += it.quantity; else receiptDeltas.push({ variantId: it.variantId, quantity: it.quantity });
     }
     const settings = await lv.posSettings();
-    const payload = { store_id: settings.storeId, order: order.order_number, source: source(order.order_number, cycle), note: posNote({ ref: order.order_number, cycle, currency: order.currency, subtotal: Number(order.subtotal), sale: Number(order.sale_discount ?? 0), bundle: Number(order.sticker_bundle_discount), promo: Number(order.discount_amount), code: order.promo_code, shipping: Number(order.shipping_fee), total: Number(order.total_amount), ...(promo.confirmed ? { confirmedBy: input.actor, promoThb: promo.discount } : {}) }), total_discounts: [], line_items: final.lines.map((l) => ({ ...l, line_taxes: settings.taxes })), payments: [{ payment_type_id: settings.paymentId }] };
+    const breakdown = posReceiptBreakdown(items, promo.discount, order.promo_code);
+    if (satang(breakdown.total) !== satang(final.total)) throw new Error("Receipt breakdown does not reconcile with the THB total. Order not verified.");
+    const discountIds = await lv.posDiscountIds(settings.storeId, breakdown.discounts.map((d) => d.name));
+    const payload = { store_id: settings.storeId, order: order.order_number, source: source(order.order_number, cycle), note: posNote({ ref: order.order_number, cycle, currency: order.currency, subtotal: Number(order.subtotal), sale: Number(order.sale_discount ?? 0), bundle: Number(order.sticker_bundle_discount), promo: Number(order.discount_amount), code: order.promo_code, shipping: Number(order.shipping_fee), total: Number(order.total_amount), ...(promo.confirmed ? { confirmedBy: input.actor, promoThb: promo.discount } : {}) }), total_discounts: breakdown.discounts.map((d) => ({ id: discountIds[d.name], scope: "RECEIPT", money_amount: d.amount })), line_items: breakdown.lines.map((l) => ({ ...l, line_taxes: settings.taxes })), payments: [{ payment_type_id: settings.paymentId }] };
     const { data: inserted, error: insertError } = await admin.from("order_pos_operations").insert({ order_id: input.id, cycle, kind, payload: json(payload), total_thb: final.total, promo_thb: promo.discount, confirmed_by: promo.confirmed ? input.actor : null }).select("*").single();
     if (insertError || !inserted) throw new Error(insertError?.message ?? "Could not save receipt intent");
     op = inserted;

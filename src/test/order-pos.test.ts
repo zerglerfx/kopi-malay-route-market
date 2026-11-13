@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("@/lib/loyverse.server", () => ({ posRequest: vi.fn(), findPosReceipt: vi.fn(), posSettings: vi.fn(), fetchLevels: vi.fn(), adjustStock: vi.fn(), pullStock: vi.fn(), writeoffTargets: vi.fn(), applyWriteoff: vi.fn() }));
+vi.mock("@/lib/loyverse.server", () => ({ posRequest: vi.fn(), findPosReceipt: vi.fn(), posSettings: vi.fn(), posDiscountIds: vi.fn(async () => ({})), fetchLevels: vi.fn(), adjustStock: vi.fn(), pullStock: vi.fn(), writeoffTargets: vi.fn(), applyWriteoff: vi.fn() }));
 import * as lv from "@/lib/loyverse.server";
 import { processOrderPos } from "@/lib/order-pos.server";
 
@@ -42,8 +42,8 @@ describe("durable POS receipt flow", () => {
  it("creates a sale without direct stock adjustment and reuses it on retry", async () => {
   expect((await verify()).ok).toBe(true); expect((await verify()).ok).toBe(true);
   expect(posts).toBe(1); expect(lv.adjustStock).not.toHaveBeenCalled();
-  expect(ops[0].payload.line_items.reduce((s: number, l: any) => s + Math.round(l.price * 100) * l.quantity, 0)).toBe(14000);
-  expect(ops[0].payload.total_discounts).toEqual([]);
+  expect(ops[0].payload.line_items.reduce((s: number, l: any) => s + Math.round(l.price * 100) * l.quantity, 0)).toBe(14700);
+  expect(ops[0].payload.total_discounts).map((d: any) => d.money_amount)).toEqual([7]);
  });
  it("shortfall prevents a receipt", async () => {
   vi.mocked(lv.fetchLevels).mockResolvedValue([{ variant_id: variant, store_id: "store", in_stock: 2 }]);
