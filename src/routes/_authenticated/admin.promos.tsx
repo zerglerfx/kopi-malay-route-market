@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { listPromos, savePromo } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/promos")({ component: PromosAdmin });
@@ -44,8 +45,11 @@ function PromosAdmin() {
   return (
     <div className="space-y-4">
       <button onClick={() => setD({ ...EMPTY })} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">+ New promo code</button>
+      <Dialog open={!!d} onOpenChange={(o) => { if (!o) setD(null); }}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader><DialogTitle>{d?.id ? "Edit promo code" : "New promo code"}</DialogTitle></DialogHeader>
       {d && (
-        <form onSubmit={submit} className="grid gap-3 rounded-md border p-4 sm:grid-cols-4">
+        <form onSubmit={submit} className="grid gap-3 sm:grid-cols-4">
           <label className="text-sm">Code<input required className={input} value={d.code} onChange={(e) => setD({ ...d, code: e.target.value.toUpperCase() })} /></label>
           <label className="text-sm">Type<select className={input} value={d.discount_type} onChange={(e) => setD({ ...d, discount_type: e.target.value as Draft["discount_type"] })}><option value="percentage">Percentage %</option><option value="fixed_amount">Fixed amount</option></select></label>
           {d.discount_type === "percentage"
@@ -67,6 +71,8 @@ function PromosAdmin() {
           </div>
         </form>
       )}
+        </DialogContent>
+      </Dialog>
       {isLoading ? <p className="text-muted-foreground">Loading…</p> : (
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full min-w-[800px] text-sm">

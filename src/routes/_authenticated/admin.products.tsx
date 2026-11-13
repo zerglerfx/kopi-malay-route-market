@@ -102,12 +102,16 @@ function ProductsAdmin() {
           <label className="text-sm sm:col-span-2">Name<input required className={input} value={d.name} onChange={(e) => setD({ ...d, name: e.target.value, slug: d.id ? d.slug : slugify(e.target.value) })} /></label>
           <label className="text-sm">Web address (slug)<input required className={input} value={d.slug} onChange={(e) => setD({ ...d, slug: e.target.value })} /></label>
           <label className="text-sm">Category<select className={input} value={d.category_id} onChange={(e) => setD({ ...d, category_id: e.target.value })}>{data.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <label className="text-sm">Weight (kg)<input type="number" step="0.001" min={0} className={input} value={d.weight_kg} onChange={(e) => setD({ ...d, weight_kg: e.target.value })} /></label>
+          <fieldset className="rounded-md border p-3 sm:col-span-4"><legend className="px-1 font-display text-xs font-semibold uppercase tracking-wide">Malaysia pricing (RM)</legend><div className="grid gap-3 sm:grid-cols-3">
           <label className="text-sm">Price RM<input required type="number" step="0.01" min={0} className={input} value={d.price} onChange={(e) => setD({ ...d, price: e.target.value })} /></label>
           <label className="text-sm">Sale price RM<input type="number" step="0.01" min={0} className={input} value={d.sale_price} onChange={(e) => setD({ ...d, sale_price: e.target.value })} /></label>
           {!isPaperBundleSticker({ name: d.name, category_slug: data.categories.find((c) => c.id === d.category_id)?.slug ?? "" }) && <label className="text-sm">THB on receipt (RM sale)<input type="number" step="0.01" min={0} inputMode="decimal" className={input} value={d.receipt_thb_rm_sale} onChange={(e) => setD({ ...d, receipt_thb_rm_sale: e.target.value })} /><span className="mt-1 block text-xs text-muted-foreground">Used only on the POS receipt for RM orders. Does not change what customers see or pay.</span></label>}
+          </div></fieldset>
+          <fieldset className="rounded-md border border-dashed p-3 sm:col-span-4"><legend className="px-1 font-display text-xs font-semibold uppercase tracking-wide">Thailand pricing (THB)</legend><div className="grid gap-3 sm:grid-cols-3">
           <label className="text-sm">Price THB<input type="number" step="0.01" min={0} className={input} value={d.price_thb} onChange={(e) => setD({ ...d, price_thb: e.target.value })} /></label>
           <label className="text-sm">Sale price THB<input type="number" step="0.01" min={0} className={input} value={d.sale_price_thb} onChange={(e) => setD({ ...d, sale_price_thb: e.target.value })} /></label>
-          <label className="text-sm">Weight (kg)<input type="number" step="0.001" min={0} className={input} value={d.weight_kg} onChange={(e) => setD({ ...d, weight_kg: e.target.value })} /></label>
+          </div></fieldset>
           <label className="text-sm sm:col-span-4">Description<textarea rows={3} className={input} value={d.description} onChange={(e) => setD({ ...d, description: e.target.value })} /></label>
           <div className="text-sm sm:col-span-2">
             <div className="flex items-center justify-between gap-2">
