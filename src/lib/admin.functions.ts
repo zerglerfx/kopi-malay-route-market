@@ -47,7 +47,7 @@ export const exportOrdersCsv = createServerFn({ method: "POST" }).middleware([re
 
 async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promise<AdminOrder[]> {
   const { data, error } = await admin.from("orders")
-    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,sticker_bundle_discount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
+    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,sticker_bundle_discount,sale_discount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
     .order("created_at", { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
   const { data: posRows, error: posError } = await admin.from("order_pos_operations").select("order_id,cycle,kind,receipt_number,total_thb,promo_thb,confirmed_by,created_at").in("order_id", (data ?? []).map((o) => o.id)).order("cycle").order("created_at");
@@ -56,7 +56,7 @@ async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promi
   const signed = paths.length ? (await admin.storage.from("payment-receipts").createSignedUrls(paths, 3600)).data ?? [] : [];
   return (data ?? []).map((o) => ({
     id: o.id, order_number: o.order_number, created_at: o.created_at, status: o.status, currency: o.currency,
-    total_amount: Number(o.total_amount), subtotal: Number(o.subtotal), shipping_fee: Number(o.shipping_fee), discount_amount: Number(o.discount_amount), sticker_bundle_discount: Number(o.sticker_bundle_discount ?? 0),
+    total_amount: Number(o.total_amount), subtotal: Number(o.subtotal), shipping_fee: Number(o.shipping_fee), discount_amount: Number(o.discount_amount), sticker_bundle_discount: Number(o.sticker_bundle_discount ?? 0), sale_discount: Number(o.sale_discount ?? 0),
     promo_code: o.promo_code, payment_method: o.payment_method, tracking_number: o.tracking_number, email: o.guest_email,
     address: (o.shipping_address ?? {}) as AdminOrderRow["address"],
     items: o.order_items ?? [],

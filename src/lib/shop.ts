@@ -82,6 +82,12 @@ export function effectivePriceThb(p: { price_thb: number | null; sale_price_thb?
   return p.sale_price_thb != null && p.sale_price_thb < p.price_thb ? p.sale_price_thb : p.price_thb;
 }
 
+/** Per-unit sale saving versus the regular destination price; 0 when not on sale. */
+export function saleSavingUnit(regular: number | null, paid: number | null): number {
+  if (regular == null || paid == null) return 0;
+  return Math.max(0, Math.round((regular - paid) * 100)) / 100;
+}
+
 export function isApparel(p: { variants: { sizes?: string[] } }): boolean {
   return (p.variants?.sizes?.length ?? 0) > 0;
 }

@@ -204,6 +204,7 @@ export type Database = {
           promo_code: string | null
           promo_snapshot: Json | null
           receipt_path: string | null
+          sale_discount: number
           shipping_address: Json
           shipping_fee: number
           status: string
@@ -237,6 +238,7 @@ export type Database = {
           promo_code?: string | null
           promo_snapshot?: Json | null
           receipt_path?: string | null
+          sale_discount?: number
           shipping_address?: Json
           shipping_fee: number
           status?: string
@@ -270,6 +272,7 @@ export type Database = {
           promo_code?: string | null
           promo_snapshot?: Json | null
           receipt_path?: string | null
+          sale_discount?: number
           shipping_address?: Json
           shipping_fee?: number
           status?: string

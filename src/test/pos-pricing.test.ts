@@ -32,6 +32,12 @@ describe("POS THB pricing", () => {
     expect(note).toContain("KM-73679 · sale 2");
     expect(note).toContain("Shipping RM 20.00 (not on receipt)");
     expect(note).toContain("THB promo 10.00 confirmed by admin admin-id");
+    expect(note).toContain("Promo KM: -RM 2.00");
+  });
+  it("shows regular subtotal minus sale on the receipt note", () => {
+    const note = posNote({ ref: "KM-1", cycle: 1, currency: "thb", subtotal: 80, sale: 20, bundle: 0, promo: 0, code: null, shipping: 0, total: 80 });
+    expect(note).toContain("Subtotal (regular) THB 100.00");
+    expect(note).toContain("Sale: -THB 20.00");
   });
   it("search and export contain old sale and refund numbers", () => {
     const o = { order_number: "KM-73679", status: "verified", currency: "myr", created_at: "2026-11-12", total_amount: 36, payment_method: "qr", tracking_number: null, email: null, address: {}, items: [], pos_history: [{ kind: "sale", cycle: 1, receipt_number: "6-52329", created_at: "1" }, { kind: "refund", cycle: 1, receipt_number: "6-52330", created_at: "2" }, { kind: "sale", cycle: 2, receipt_number: "6-52331", created_at: "3" }] };

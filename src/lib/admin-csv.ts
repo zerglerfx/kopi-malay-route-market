@@ -8,6 +8,7 @@ export type AdminOrderRow = {
   shipping_fee?: number;
   discount_amount?: number;
   sticker_bundle_discount?: number;
+  sale_discount?: number;
   promo_code?: string | null;
   payment_method: string;
   tracking_number: string | null;
@@ -36,7 +37,7 @@ export const itemsText = (items: AdminOrderRow["items"]) =>
 export function orderTotals(o: AdminOrderRow) {
   const subtotal = Number(o.subtotal ?? 0), bundle = Number(o.sticker_bundle_discount ?? 0), promo = Number(o.discount_amount ?? 0);
   const shipping = Number(o.shipping_fee ?? 0), total = Number(o.total_amount);
-  return { currency: o.currency.toUpperCase(), subtotal, bundle, promo, promoCode: o.promo_code ?? null, shipping, total };
+  return { currency: o.currency.toUpperCase(), subtotal, sale: Number(o.sale_discount ?? 0), bundle, promo, promoCode: o.promo_code ?? null, shipping, total };
 }
 
 export const money = (currency: string, n: number) => (currency.toLowerCase() === "myr" ? `RM ${n.toFixed(2)}` : `THB ${n.toFixed(2)}`);

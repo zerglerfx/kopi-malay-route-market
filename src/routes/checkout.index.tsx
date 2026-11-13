@@ -12,7 +12,7 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country , saleSavingUnit } from "@/lib/shop";
 import { stickerBundle } from "@/lib/sticker-bundle";
 
 export const Route = createFileRoute("/checkout/")({
@@ -69,6 +69,7 @@ function Checkout() {
   });
   const unavailable = lines.some((line) => line.price == null);
   const subtotal = lines.reduce((sum, line) => sum + (line.price ?? 0) * line.quantity, 0);
+  const sale = Math.round(lines.reduce((sum, line) => sum + (line.product ? saleSavingUnit(country === "Thailand" ? line.product.price_thb : line.product.price, line.price) : 0) * line.quantity, 0) * 100) / 100;
   const bundle = stickerBundle(lines.map((line) => ({ name: line.product?.name ?? "", category_slug: line.product?.category_slug ?? "", quantity: line.quantity })), country);
   const shippingLines = lines.map((line) => ({ quantity: line.quantity, category_slug: line.product?.category_slug ?? "other-merch", weight_kg: line.product?.weight_kg ?? null }));
   const weight = parcelWeight(shippingLines);
@@ -230,7 +231,8 @@ function Checkout() {
               )}
               {promoErr && <p role="alert" className="text-sm text-sale">{promoErr}</p>}
             </div>
-            <div className="flex justify-between"><dt>Subtotal</dt><dd>{unavailable ? "—" : money(subtotal)}</dd></div>
+            <div className="flex justify-between"><dt>Subtotal{sale > 0 ? " (regular price)" : ""}</dt><dd>{unavailable ? "—" : money(subtotal + sale)}</dd></div>
+            {!unavailable && sale > 0 && <div className="flex justify-between text-primary"><dt>Sale</dt><dd>- {money(sale)}</dd></div>}
             {bundle.groups > 0 && <div className="flex justify-between gap-3 text-primary"><dt>3x Sticker Bundle Discount Applied ({bundle.groups} × 3 for {money(bundle.bundle)})</dt><dd className="shrink-0">- {money(bundle.discount)}</dd></div>}
             <div className="flex justify-between gap-3"><dt>{weight.complete ? "Parcel weight" : "Known parcel weight"}</dt><dd className="text-right">{formatParcelWeight(weight)}</dd></div>
             {promo && discount > 0 && <div className="flex justify-between text-primary"><dt>Discount ({promo.code}{promo.label ? ` · ${promo.label}` : ""})</dt><dd>- {money(discount)}</dd></div>}
@@ -250,6 +252,7 @@ function Checkout() {
               </div>
             )}
             <div className="flex justify-between pt-2 font-display text-lg font-bold"><dt>Total</dt><dd>{unavailable || ship == null ? "—" : money(payable)}</dd></div>
+            <p className="text-right text-xs text-muted-foreground">Price inclusive of 7% VAT</p>
           </dl>
           {unavailable && <p role="alert" className="mt-3 text-sm text-sale">Some items have no price for {country} or are no longer available. Remove them or choose another destination.</p>}
           {ship == null && <p role="alert" className="mt-3 text-sm text-sale">Tumbler weight is unavailable. Please contact Kopi Malay for shipping.</p>}

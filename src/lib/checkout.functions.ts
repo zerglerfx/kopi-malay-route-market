@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { effectivePrice, effectivePriceThb, formatMoney, formatParcelWeight, parcelWeight, shippingFee, thailandTumblerShipping } from "./shop";
+import { effectivePrice, effectivePriceThb, formatMoney, formatParcelWeight, parcelWeight, shippingFee, thailandTumblerShipping , saleSavingUnit } from "./shop";
 import { CheckoutDetails, validateDeliveryState } from "./checkout-validation";
 import { computePromoDiscount, type Promo } from "./promo";
 import { makeOrderRef, ORDER_REF_RE, receiptError } from "./manual-order";
@@ -104,7 +104,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       if (sizes.length && !sizes.includes(i.variant)) throw new Error(`Please choose a size for ${p.name}.`);
       if (data.country === "Thailand" && p.price_thb == null) throw new Error(`Thailand pricing is not available yet for ${p.name}.`);
       const unit = data.country === "Thailand" ? Number(effectivePriceThb({ price_thb: Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) })) : effectivePrice({ price: Number(p.price), sale_price: p.sale_price == null ? null : Number(p.sale_price) });
-      return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "", receiptThb: receiptUnitThb({ name: p.name, category_slug: p.categories?.slug ?? "", sale_price: p.sale_price == null ? null : Number(p.sale_price), receipt_thb_rm_sale: p.receipt_thb_rm_sale == null ? null : Number(p.receipt_thb_rm_sale) }, unit, data.country === "Thailand" ? "thb" : "myr") };
+      return { ...i, name: p.name, unit, weight_kg: p.weight_kg == null ? null : Number(p.weight_kg), category_slug: p.categories?.slug ?? "other-merch", variant: sizes.length ? i.variant : "", saleUnit: saleSavingUnit(data.country === "Thailand" ? Number(p.price_thb) : Number(p.price), unit), receiptThb: receiptUnitThb({ name: p.name, category_slug: p.categories?.slug ?? "", sale_price: p.sale_price == null ? null : Number(p.sale_price), receipt_thb_rm_sale: p.receipt_thb_rm_sale == null ? null : Number(p.receipt_thb_rm_sale) }, unit, data.country === "Thailand" ? "thb" : "myr") };
     });
 
     // Stock check against live Loyverse levels for tracked items.
@@ -135,6 +135,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
     }
 
     const subtotal = lines.reduce((s, l) => s + l.unit * l.quantity, 0);
+    const saleDiscount = Math.round(lines.reduce((s, l) => s + l.saleUnit * l.quantity, 0) * 100) / 100;
     const bundle = stickerBundle(lines, data.country);
     const weight = parcelWeight(lines);
     const ship = shippingFee(data.country, lines, data.state);
@@ -171,7 +172,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         subtotal, shipping_fee: ship, total_amount: total, promo_code: promoCode, discount_amount: discount,
         promo_snapshot: savedPromo,
         pos_receipt_snapshot: buildReceiptSnapshot(currency, lines, receiptPromoThb),
-        sticker_bundle_discount: bundle.discount,
+        sticker_bundle_discount: bundle.discount, sale_discount: saleDiscount,
         parcel_weight_kg: weight.kg, parcel_weight_complete: weight.complete,
         status: "pending_verification", stock_status: "not_deducted", stock_deductions: sold, payment_method: data.country === "Thailand" ? "PromptPay QR" : "DuitNow QR", access_token: token,
       }).select("id, order_number").single();
@@ -216,7 +217,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
         ``,
         ...(promoCode ? [`🎟️ Promo Code Applied: ${esc(promoCode)} (-${m(discount)})`] : []),
         ...(bundle.groups > 0 ? [`🏷️ 8×8cm sticker bundle: ${bundle.groups} × ${m(bundle.bundle)}${bundle.remainder ? ` + ${bundle.remainder} × ${m(bundle.unit)}` : ""}; saved ${m(bundle.discount)}`] : []),
-        `💰 Subtotal ${m(subtotal)}${bundle.discount ? ` − Bundle ${m(bundle.discount)}` : ""}${discount ? ` − Discount ${m(discount)}` : ""} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
+        `💰 Subtotal ${saleDiscount ? `${m(subtotal + saleDiscount)} − Sale ${m(saleDiscount)} = ${m(subtotal)}` : m(subtotal)}${bundle.discount ? ` − Bundle ${m(bundle.discount)}` : ""}${discount ? ` − Discount ${m(discount)}` : ""} + Shipping ${m(ship)} = <b>${m(total)}</b>`,
         url ? `📄 <a href="${url}">View receipt</a> (link valid 7 days)` : `📄 Receipt saved (link unavailable)`,
       ].join("\n");
       await notifyTelegram(text, url, ext === "pdf");
@@ -229,7 +230,7 @@ export const submitManualOrder = createServerFn({ method: "POST" })
 
 export type OrderSummary = {
   currency: string; order_number: string; status: string; created_at: string;
-  subtotal: number; shipping_fee: number; total_amount: number; promo_code: string | null; discount_amount: number; sticker_bundle_discount: number; email: string | null;
+  subtotal: number; shipping_fee: number; total_amount: number; promo_code: string | null; discount_amount: number; sticker_bundle_discount: number; sale_discount: number; email: string | null;
   shipping_address: { name?: string; phone?: string; address?: string; city?: string; state?: string; postcode?: string; country?: string };
   items: { product_name: string; selected_variant: string; unit_price: number; quantity: number }[];
 };
@@ -244,7 +245,7 @@ export const getOrderByReference = createServerFn({ method: "GET" })
       currency: order.currency, order_number: order.order_number, status: order.status, created_at: order.created_at,
       subtotal: Number(order.subtotal), shipping_fee: Number(order.shipping_fee), total_amount: Number(order.total_amount),
       promo_code: order.promo_code, discount_amount: Number(order.discount_amount ?? 0),
-      sticker_bundle_discount: Number(order.sticker_bundle_discount ?? 0),
+      sticker_bundle_discount: Number(order.sticker_bundle_discount ?? 0), sale_discount: Number(order.sale_discount ?? 0),
       email: order.guest_email, shipping_address: order.shipping_address as OrderSummary["shipping_address"],
       items: (order.order_items ?? []).map((i: { product_name: string; selected_variant: string; unit_price: number; quantity: number }) => ({
         product_name: i.product_name, selected_variant: i.selected_variant, unit_price: Number(i.unit_price), quantity: i.quantity,

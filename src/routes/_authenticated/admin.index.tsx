@@ -239,7 +239,8 @@ function Totals({ o }: { o: AdminOrderRow }) {
   const row = (k: string, v: string, strong = false) => <div className={`flex justify-between gap-3 text-xs ${strong ? "border-t pt-1 text-sm font-semibold" : ""}`}><span>{k}</span><span className="tabular-nums">{v}</span></div>;
   return (
     <div className="space-y-0.5">
-      {row("Subtotal", money(o.currency, t.subtotal))}
+      {row(t.sale > 0 ? "Subtotal (regular price)" : "Subtotal", money(o.currency, t.subtotal + t.sale))}
+      {t.sale > 0 && row("Sale", `− ${money(o.currency, t.sale)}`)}
       {t.bundle > 0 && row("Bundle savings", `− ${money(o.currency, t.bundle)}`)}
       {(t.promoCode || t.promo > 0) && row(`Promo${t.promoCode ? ` ${t.promoCode}` : ""}`, `− ${money(o.currency, t.promo)}`)}
       {row("Shipping", t.shipping > 0 ? `+ ${money(o.currency, t.shipping)}` : "Free")}

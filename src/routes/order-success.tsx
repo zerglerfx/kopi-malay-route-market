@@ -63,7 +63,8 @@ function OrderSuccess() {
           ))}
         </ul>
         <dl className="mt-4 space-y-1">
-          <div className="flex justify-between"><dt>Subtotal</dt><dd>{money(order.subtotal)}</dd></div>
+          <div className="flex justify-between"><dt>Subtotal{order.sale_discount > 0 ? " (regular price)" : ""}</dt><dd>{money(order.subtotal + order.sale_discount)}</dd></div>
+          {order.sale_discount > 0 && <div className="flex justify-between text-primary"><dt>Sale</dt><dd>- {money(order.sale_discount)}</dd></div>}
           {order.sticker_bundle_discount > 0 && <div className="flex justify-between text-primary"><dt>8×8cm sticker bundle savings</dt><dd>- {money(order.sticker_bundle_discount)}</dd></div>}
           {order.discount_amount > 0 && <div className="flex justify-between text-primary"><dt>Promo {order.promo_code}</dt><dd>- {money(order.discount_amount)}</dd></div>}
           <div className="flex justify-between"><dt>Shipping</dt><dd>{order.shipping_fee === 0 ? "Free" : money(order.shipping_fee)}</dd></div>

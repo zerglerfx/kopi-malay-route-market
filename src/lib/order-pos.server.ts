@@ -43,7 +43,7 @@ async function ensureReceipt(admin: Admin, op: Operation, ref: string): Promise<
 }
 
 export async function processOrderPos(admin: Admin, input: { id: string; action: "deduct" | "restore"; actor: string; returnToStock?: boolean | undefined; promoThb?: number | undefined }): Promise<PosResult> {
-  const { data: order, error } = await admin.from("orders").select("id,order_number,status,currency,subtotal,shipping_fee,total_amount,discount_amount,sticker_bundle_discount,promo_code,promo_snapshot,pos_receipt_snapshot,stock_deductions,order_items(product_id,product_name,selected_variant,unit_price,quantity)").eq("id", input.id).single();
+  const { data: order, error } = await admin.from("orders").select("id,order_number,status,currency,subtotal,shipping_fee,total_amount,discount_amount,sticker_bundle_discount,sale_discount,promo_code,promo_snapshot,pos_receipt_snapshot,stock_deductions,order_items(product_id,product_name,selected_variant,unit_price,quantity)").eq("id", input.id).single();
   if (error || !order) throw new Error(error?.message ?? "Order not found");
   const { data: operations, error: historyError } = await admin.from("order_pos_operations").select("*").eq("order_id", input.id).order("cycle", { ascending: false }).order("created_at", { ascending: false });
   if (historyError) throw new Error(historyError.message);
@@ -90,7 +90,7 @@ export async function processOrderPos(admin: Admin, input: { id: string; action:
       if (existing) existing.quantity += it.quantity; else receiptDeltas.push({ variantId: it.variantId, quantity: it.quantity });
     }
     const settings = await lv.posSettings();
-    const payload = { store_id: settings.storeId, order: order.order_number, source: source(order.order_number, cycle), note: posNote({ ref: order.order_number, cycle, currency: order.currency, subtotal: Number(order.subtotal), bundle: Number(order.sticker_bundle_discount), promo: Number(order.discount_amount), code: order.promo_code, shipping: Number(order.shipping_fee), total: Number(order.total_amount), ...(promo.confirmed ? { confirmedBy: input.actor, promoThb: promo.discount } : {}) }), total_discounts: [], line_items: final.lines.map((l) => ({ ...l, line_taxes: settings.taxes })), payments: [{ payment_type_id: settings.paymentId }] };
+    const payload = { store_id: settings.storeId, order: order.order_number, source: source(order.order_number, cycle), note: posNote({ ref: order.order_number, cycle, currency: order.currency, subtotal: Number(order.subtotal), sale: Number(order.sale_discount ?? 0), bundle: Number(order.sticker_bundle_discount), promo: Number(order.discount_amount), code: order.promo_code, shipping: Number(order.shipping_fee), total: Number(order.total_amount), ...(promo.confirmed ? { confirmedBy: input.actor, promoThb: promo.discount } : {}) }), total_discounts: [], line_items: final.lines.map((l) => ({ ...l, line_taxes: settings.taxes })), payments: [{ payment_type_id: settings.paymentId }] };
     const { data: inserted, error: insertError } = await admin.from("order_pos_operations").insert({ order_id: input.id, cycle, kind, payload: json(payload), total_thb: final.total, promo_thb: promo.discount, confirmed_by: promo.confirmed ? input.actor : null }).select("*").single();
     if (insertError || !inserted) throw new Error(insertError?.message ?? "Could not save receipt intent");
     op = inserted;

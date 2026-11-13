@@ -155,6 +155,13 @@
       "when": 1794521894358,
       "tag": "0021_receipt_thb_overrides",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1794543047107,
+      "tag": "0022_order_sale_discount",
+      "breakpoints": true
     }
   ]
 }
