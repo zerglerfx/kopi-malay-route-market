@@ -186,6 +186,51 @@ export type Database = {
           },
         ]
       }
+      order_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string
+          from_status: string | null
+          id: string
+          notes: string | null
+          old_tracking_number: string | null
+          order_id: string
+          order_number: string
+          pos_receipt_number: string | null
+          to_status: string
+          tracking_number: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string
+          from_status?: string | null
+          id?: string
+          notes?: string | null
+          old_tracking_number?: string | null
+          order_id: string
+          order_number: string
+          pos_receipt_number?: string | null
+          to_status: string
+          tracking_number?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string
+          from_status?: string | null
+          id?: string
+          notes?: string | null
+          old_tracking_number?: string | null
+          order_id?: string
+          order_number?: string
+          pos_receipt_number?: string | null
+          to_status?: string
+          tracking_number?: string | null
+        }
+        Relationships: []
+      }
       orders: {
         Row: {
           access_token: string | null
@@ -636,6 +681,10 @@ export type Database = {
         Args: { _busy: string; _claim: string; _id: string; _prev: string }
         Returns: boolean
       }
+      claim_order_verify: {
+        Args: { _claim: string; _id: string }
+        Returns: string
+      }
       designated_google_admin_matches: {
         Args: {
           _confirmed_at: string
@@ -654,6 +703,21 @@ export type Database = {
         Returns: boolean
       }
       redeem_promo_code: { Args: { _code: string }; Returns: boolean }
+      transition_order_status: {
+        Args: {
+          _actor: string
+          _actor_email: string
+          _claim?: string
+          _deltas?: Json
+          _from: string
+          _id: string
+          _notes?: string
+          _pos_receipt?: string
+          _to: string
+          _tracking?: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"

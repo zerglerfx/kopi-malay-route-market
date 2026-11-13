@@ -162,6 +162,20 @@
       "when": 1794543047107,
       "tag": "0022_order_sale_discount",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1794612169096,
+      "tag": "0023_order_status_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794612316554,
+      "tag": "0024_order_history_insert_via_function_only",
+      "breakpoints": true
     }
   ]
 }

@@ -4,8 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, ImagePlus, QrCode, Trash2 } from "lucide-react";
+import { type OrderAction } from "@/lib/order-flow";
 import { QRCodeSVG } from "qrcode.react";
-import { exportOrdersCsv, listOrders, markOrderStock, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
+import { exportOrdersCsv, getOrderHistory, listOrders, markOrderStock, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
 import { STOCK_LABEL } from "@/lib/order-stock";
 import { filterOrders, fullAddress, itemsText, money, orderTotals, statusOptions, type AdminOrderRow, type OrderFilters } from "@/lib/admin-csv";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -13,7 +14,6 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/admin/")({ component: OrdersAdmin, head: () => ({ meta: [{ title: "Orders | Kopi Malay Admin" }, { name: "description", content: "Manage Kopi Malay website orders and POS receipt history." }, { property: "og:title", content: "Orders | Kopi Malay Admin" }, { property: "og:description", content: "Manage Kopi Malay website orders and POS receipt history." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }) });
 
-const STATUS = ["pending_verification", "verified", "rejected", "shipped", "completed", "pending", "paid"] as const;
 const label = (s: string) => s.replace(/_/g, " ");
 
 function OrdersAdmin() {
@@ -30,7 +30,6 @@ function OrdersAdmin() {
   const [labelOrder, setLabelOrder] = useState<AdminOrder | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [updating, setUpdating] = useState<string | null>(null);
-  const [returnChoice, setReturnChoice] = useState<{ id: string; status: (typeof STATUS)[number] } | null>(null);
   const [promoChoice, setPromoChoice] = useState<{ id: string; paidDiscount: number; currency: string; maxThb: number } | null>(null);
   const [promoValue, setPromoValue] = useState("");
   const saveLabel = useServerFn(setTrackingLabel);
@@ -42,23 +41,29 @@ function OrdersAdmin() {
     catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
   };
 
+  const [progress, setProgress] = useState<{ id: string; name: string; pct: number } | null>(null);
+  const [labelError, setLabelError] = useState<{ id: string; msg: string } | null>(null);
   const uploadLabel = async (o: AdminOrder, file: File | null) => {
-    if (file && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) { toast.error("Please choose a PNG, JPG or WEBP image"); return; }
-    if (file && file.size > 5 * 1024 * 1024) { toast.error("Image must be 5MB or smaller"); return; }
+    setLabelError(null);
+    if (file && !["image/png", "image/jpeg", "image/webp"].includes(file.type)) { setLabelError({ id: o.id, msg: `${file.name}: please use a PNG, JPG or WEBP image` }); return; }
+    if (file && file.size > 5 * 1024 * 1024) { setLabelError({ id: o.id, msg: `${file.name}: image must be 5MB or smaller` }); return; }
     setBusy(o.id);
+    if (file) setProgress({ id: o.id, name: file.name, pct: 0 });
     try {
-      const dataUrl = file ? await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); }) : null;
+      const dataUrl = file ? await new Promise<string>((res, rej) => { const r = new FileReader(); r.onprogress = (e) => e.lengthComputable && setProgress({ id: o.id, name: file.name, pct: Math.round((e.loaded / e.total) * 50) }); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(file); }) : null;
+      if (file) setProgress({ id: o.id, name: file.name, pct: 75 });
       await saveLabel({ data: { id: o.id, dataUrl } });
+      if (file) setProgress({ id: o.id, name: file.name, pct: 100 });
       toast.success(file ? "Courier label saved" : "Courier label removed");
       await qc.invalidateQueries({ queryKey: ["admin", "orders"] });
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Upload failed"); }
-    finally { setBusy(null); }
+    } catch (e) { setLabelError({ id: o.id, msg: e instanceof Error ? e.message : "Upload failed" }); }
+    finally { setBusy(null); setProgress(null); }
   };
 
   const rows = useMemo(() => filterOrders(data, filters), [data, filters]);
   const statuses = useMemo(() => statusOptions(data), [data]);
 
-  const patch = async (id: string, p: { status?: (typeof STATUS)[number]; tracking_number?: string | null; return_to_stock?: boolean; promo_thb?: number }) => {
+  const patch = async (id: string, p: { action: OrderAction; tracking_number?: string; promo_thb?: number }) => {
     if (updating) return;
     setUpdating(id);
     try {
@@ -66,10 +71,9 @@ function OrdersAdmin() {
       if (!r.ok) {
         if ("shortfall" in r) setShortfall(r.shortfall);
         else if ("promoConfirmation" in r) { setPromoValue(""); setPromoChoice({ id, ...r.promoConfirmation }); }
-        else if ("returnStockRequired" in r && p.status) setReturnChoice({ id, status: p.status });
-      } else { setReturnChoice(null); setPromoChoice(null); toast.success("Order updated"); }
+      } else { setPromoChoice(null); toast.success("Order updated"); }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
-    finally { setUpdating(null); void qc.invalidateQueries({ queryKey: ["admin", "orders"] }); }
+    finally { setUpdating(null); void qc.invalidateQueries({ queryKey: ["admin"] }); }
   };
 
   const exportCsv = async () => {
@@ -122,10 +126,6 @@ function OrdersAdmin() {
                     <PosNumbers o={o} />
                     <div className="text-xs text-muted-foreground">{o.payment_method}{o.promo_code ? ` · ${o.promo_code}` : ""}</div>
                     {o.receipt_url ? <a href={o.receipt_url} target="_blank" rel="noreferrer" className="text-xs font-medium underline">View receipt</a> : <span className="text-xs text-muted-foreground">No receipt</span>}
-                    {o.status !== "verified" && o.status !== "rejected" && o.status !== "shipped" && o.status !== "completed" && <div className="mt-1 flex gap-1">
-                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => void patch(o.id, { status: "verified" })}>Verify</Button>
-                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => void patch(o.id, { status: "rejected" })}>Reject</Button>
-                    </div>}
                   </td>
                   <td className="max-w-[260px] px-3 py-2">{itemsText(o.items)}<button onClick={() => setDetails(o)} className="mt-1 block text-xs font-medium underline">View details</button></td>
                   <td className="min-w-[180px] px-3 py-2"><Totals o={o} /></td>
@@ -137,25 +137,18 @@ function OrdersAdmin() {
                     ) : (
                       <div className="grid h-40 w-full place-items-center rounded-md border border-dashed text-xs text-muted-foreground">No courier label yet</div>
                     )}
-                    <div className="mt-2 flex gap-2">
-                      <label className={`flex flex-1 cursor-pointer items-center justify-center gap-1 rounded border px-2 py-1 text-xs font-medium hover:bg-muted ${busy === o.id ? "pointer-events-none opacity-50" : ""}`}>
-                        <ImagePlus className="size-3.5" /> {busy === o.id ? "Uploading…" : o.label_url ? "Replace J&T QR" : "Upload J&T QR"}
-                        <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { void uploadLabel(o, e.target.files?.[0] ?? null); e.target.value = ""; }} />
-                      </label>
-                      {o.label_url && <button aria-label="Remove courier label" disabled={busy === o.id} onClick={() => void uploadLabel(o, null)} className="rounded border px-2 py-1 hover:bg-muted"><Trash2 className="size-3.5" /></button>}
-                    </div>
+                    <LabelDrop busy={busy === o.id} hasLabel={!!o.label_url} progress={progress?.id === o.id ? progress : null} error={labelError?.id === o.id ? labelError.msg : null} onFile={(f) => void uploadLabel(o, f)} />
+                    {o.label_url && <button aria-label="Remove courier label" disabled={busy === o.id} onClick={() => void uploadLabel(o, null)} className="mt-1 flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-muted"><Trash2 className="size-3.5" /> Remove label</button>}
                     <div className="mt-2 flex items-center gap-2 font-mono text-xs">{o.order_number}<button aria-label="Show QR code" onClick={() => setQr(o)}><QrCode className="size-4" /></button></div>
-                    <input
-                      defaultValue={o.tracking_number ?? ""} placeholder="Tracking no."
-                      onBlur={(e) => { const v = e.target.value.trim() || null; if (v !== o.tracking_number) void patch(o.id, { tracking_number: v }); }}
-                      className="mt-1 w-full rounded border bg-card px-2 py-1 text-xs"
-                    />
+                    <TrackingControls key={`${o.id}-${o.status}-${o.tracking_number ?? ""}`} o={o} disabled={!!updating} onAction={(action, tracking) => void patch(o.id, tracking ? { action, tracking_number: tracking } : { action })} />
                     <div className="mt-1 text-xs text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</div>
                   </td>
                   <td className="px-3 py-2">
-                    <select disabled={!!updating} value={o.status} onChange={(e) => patch(o.id, { status: e.target.value as (typeof STATUS)[number] })} className="rounded border bg-card px-2 py-1 text-xs capitalize">
-                      {STATUS.map((s) => <option key={s} value={s}>{label(s)}</option>)}
-                    </select>
+                    <span className="inline-block rounded border px-2 py-0.5 text-xs font-semibold capitalize">{o.status === "verifying" ? "Verifying…" : label(o.status)}</span>
+                    {o.status === "pending_verification" && <div className="mt-2 flex flex-col gap-1">
+                      <Button size="sm" disabled={!!updating} onClick={() => void patch(o.id, { action: "verify" })}>{updating === o.id ? "Working…" : "Verify"}</Button>
+                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => { if (confirm(`Reject ${o.order_number}? This cannot be undone.`)) void patch(o.id, { action: "reject" }); }}>Reject</Button>
+                    </div>}
                     <div className={`mt-2 inline-block rounded border px-2 py-0.5 text-xs ${o.stock_status === "deducted" ? "bg-primary text-primary-foreground" : o.stock_status === "unknown" ? "border-dashed" : "text-muted-foreground"}`}>{STOCK_LABEL[o.stock_status]}</div>
                     {o.stock_status === "unknown" && o.status === "rejected" && <button onClick={() => void markRestored(o)} className="mt-1 block rounded border px-2 py-0.5 text-xs hover:bg-muted">Mark restored</button>}
                   </td>
@@ -166,20 +159,10 @@ function OrdersAdmin() {
           </table>
         </div>
       )}
-      <Dialog open={!!returnChoice} onOpenChange={(v) => !v && !updating && setReturnChoice(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Return items to stock?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">A linked POS refund will be created. If the items are not coming back, they will be written off after the refund.</p>
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={!!updating} onClick={() => returnChoice && void patch(returnChoice.id, { status: returnChoice.status, return_to_stock: true })}>Yes, return to stock</Button>
-            <Button variant="outline" disabled={!!updating} onClick={() => returnChoice && void patch(returnChoice.id, { status: returnChoice.status, return_to_stock: false })}>No, write off items</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
       <Dialog open={!!promoChoice} onOpenChange={(v) => !v && !updating && setPromoChoice(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Confirm THB promo discount</DialogTitle></DialogHeader>
-          {promoChoice && <><p className="text-sm">Customer received {money(promoChoice.currency, promoChoice.paidDiscount)} promo discount.</p><label className="space-y-1 text-sm"><span>THB discount (maximum {money("thb", promoChoice.maxThb)})</span><input aria-label="THB promo discount" type="number" min="0" max={promoChoice.maxThb} step="0.01" value={promoValue} onChange={(e) => setPromoValue(e.target.value)} className="w-full rounded border bg-card px-3 py-2" /></label><Button disabled={!!updating || !promoValue || !Number.isFinite(Number(promoValue)) || Number(promoValue) < 0 || Number(promoValue) > promoChoice.maxThb} onClick={() => void patch(promoChoice.id, { status: "verified", promo_thb: Number(promoValue) })}>Confirm discount and verify</Button></>}
+          {promoChoice && <><p className="text-sm">Customer received {money(promoChoice.currency, promoChoice.paidDiscount)} promo discount.</p><label className="space-y-1 text-sm"><span>THB discount (maximum {money("thb", promoChoice.maxThb)})</span><input aria-label="THB promo discount" type="number" min="0" max={promoChoice.maxThb} step="0.01" value={promoValue} onChange={(e) => setPromoValue(e.target.value)} className="w-full rounded border bg-card px-3 py-2" /></label><Button disabled={!!updating || !promoValue || !Number.isFinite(Number(promoValue)) || Number(promoValue) < 0 || Number(promoValue) > promoChoice.maxThb} onClick={() => void patch(promoChoice.id, { action: "verify", promo_thb: Number(promoValue) })}>Confirm discount and verify</Button></>}
         </DialogContent>
       </Dialog>
       <Dialog open={!!qr} onOpenChange={(v) => !v && setQr(null)}>
@@ -214,6 +197,7 @@ function OrdersAdmin() {
               <div>Tracking no.: {details.tracking_number ?? "—"}</div>
               {details.label_url && <img src={details.label_url} alt={`Courier label for ${details.order_number}`} className="max-h-48 rounded border object-contain" />}
             </div>
+            <History id={details.id} />
           </div>}
         </DialogContent>
       </Dialog>
@@ -245,6 +229,66 @@ function Totals({ o }: { o: AdminOrderRow }) {
       {(t.promoCode || t.promo > 0) && row(`Promo${t.promoCode ? ` ${t.promoCode}` : ""}`, `− ${money(o.currency, t.promo)}`)}
       {row("Shipping", t.shipping > 0 ? `+ ${money(o.currency, t.shipping)}` : "Free")}
       {row("Total", money(o.currency, t.total), true)}
+    </div>
+  );
+}
+
+function History({ id }: { id: string }) {
+  const fetchHistory = useServerFn(getOrderHistory);
+  const { data, isLoading, error } = useQuery({ queryKey: ["admin", "order-history", id], queryFn: () => fetchHistory({ data: { id } }) });
+  return (
+    <div className="space-y-1">
+      <div className="font-semibold">Audit trail</div>
+      {isLoading ? <p className="text-xs text-muted-foreground">Loading…</p> : error ? <p className="text-xs text-destructive">{error.message}</p> : !data?.length ? <p className="text-xs text-muted-foreground">No status changes recorded yet.</p> : (
+        <ol className="space-y-2 border-l pl-3">
+          {data.map((h) => (
+            <li key={h.id} className="text-xs">
+              <div className="font-medium capitalize">{h.from_status === h.to_status ? "Tracking corrected" : `${label(h.from_status ?? "—")} → ${label(h.to_status)}`}</div>
+              <div className="text-muted-foreground">{new Date(h.changed_at).toLocaleString()} · {h.changed_by_email || "admin"}</div>
+              {h.old_tracking_number ? <div>Tracking: <span className="font-mono">{h.old_tracking_number}</span> → <span className="font-mono">{h.tracking_number}</span></div> : h.to_status === "shipped" && h.tracking_number && <div>Tracking: <span className="font-mono">{h.tracking_number}</span></div>}
+              {h.pos_receipt_number && <div>POS receipt: <span className="font-mono">{h.pos_receipt_number}</span></div>}
+              {h.notes && <div>{h.notes}</div>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function TrackingControls({ o, disabled, onAction }: { o: AdminOrder; disabled: boolean; onAction: (a: OrderAction, tracking?: string) => void }) {
+  const [value, setValue] = useState(o.tracking_number ?? "");
+  const v = value.trim();
+  if (o.status !== "verified" && o.status !== "shipped") return <div className="mt-1 text-xs">Tracking: <span className="font-mono">{o.tracking_number ?? "—"}</span></div>;
+  return (
+    <div className="mt-1 space-y-1">
+      <input aria-label="Tracking number" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Tracking no." maxLength={80} className="w-full rounded border bg-card px-2 py-1 text-xs" />
+      {o.status === "verified" && <Button size="sm" className="w-full" disabled={disabled || !v} onClick={() => onAction("ship", v)}>Mark as Shipped</Button>}
+      {o.status === "shipped" && <>
+        {v && v !== o.tracking_number && <Button size="sm" variant="outline" className="w-full" disabled={disabled} onClick={() => onAction("tracking", v)}>Save tracking correction</Button>}
+        <Button size="sm" className="w-full" disabled={disabled} onClick={() => { if (confirm(`Mark ${o.order_number} as received? Tracking will be locked.`)) onAction("complete"); }}>Received</Button>
+      </>}
+    </div>
+  );
+}
+
+function LabelDrop({ busy, hasLabel, progress, error, onFile }: { busy: boolean; hasLabel: boolean; progress: { name: string; pct: number } | null; error: string | null; onFile: (f: File) => void }) {
+  const [over, setOver] = useState(false);
+  return (
+    <div className="mt-2">
+      <label
+        onDragOver={(e) => { e.preventDefault(); if (!busy) setOver(true); }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; if (f && !busy) onFile(f); }}
+        className={`flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-2 py-3 text-center text-xs transition-colors ${over ? "border-primary bg-muted" : "border-border hover:bg-muted"} ${busy ? "pointer-events-none opacity-60" : ""}`}
+      >
+        <ImagePlus className="size-4" />
+        <span className="font-medium">{over ? "Drop to upload" : hasLabel ? "Drop or click to replace J&T QR" : "Drop J&T QR here or click to browse"}</span>
+        <span className="text-muted-foreground">PNG, JPG or WEBP · max 5MB</span>
+        <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      </label>
+      {progress && <div className="mt-1 text-xs"><div className="truncate">{progress.name} · {progress.pct < 100 ? "Uploading…" : "Done"}</div><div className="mt-0.5 h-1.5 overflow-hidden rounded bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${progress.pct}%` }} /></div></div>}
+      {error && <p role="alert" className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }

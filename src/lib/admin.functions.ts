@@ -3,7 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { filterOrders, ordersToCsv, type AdminOrderRow } from "./admin-csv";
 import { TOWING_STATUSES } from "./towing";
-import { planStockAction, type StockStatus } from "./order-stock";
+import { type StockStatus } from "./order-stock";
+import { ORDER_ACTIONS, ORDER_FLOW } from "./order-flow";
 type StockDelta = { variantId: string; quantity: number };
 type UpdateResult = { ok: true } | { ok: false; shortfall: { item: string; needed: number; available: number }[] } | { ok: false; promoConfirmation: { paidDiscount: number; currency: string; maxThb: number } } | { ok: false; returnStockRequired: true };
 
@@ -99,62 +100,66 @@ export const setTrackingLabel = createServerFn({ method: "POST" }).middleware([r
 export const updateOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({
     id: z.string().uuid(),
-    status: z.enum(["pending", "paid", "pending_verification", "verified", "rejected", "shipped", "completed"]).optional(),
-    tracking_number: z.string().trim().max(80).nullable().optional(),
-    return_to_stock: z.boolean().optional(),
+    action: z.enum(ORDER_ACTIONS),
+    tracking_number: z.string().trim().max(80).optional(),
     promo_thb: z.number().min(0).max(10000000).multipleOf(0.01).optional(),
   }).parse(d))
   .handler(async ({ data, context }): Promise<UpdateResult> => {
-    const admin = await adminClient(context as unknown as Ctx);
-    const patch: { status?: string; tracking_number?: string | null } = {};
-    if (data.tracking_number !== undefined) patch.tracking_number = data.tracking_number;
-    if (data.status !== undefined) {
-      const { data: cur, error: e } = await admin.from("orders").select("status,stock_status,stock_deductions,pos_claim_until").eq("id", data.id).single();
-      if (e || !cur) throw new Error(e?.message ?? "Order not found");
-      const busyExpired = ["deducting", "restoring"].includes(cur.stock_status) && cur.pos_claim_until && new Date(cur.pos_claim_until).getTime() < Date.now();
-      if (busyExpired && (cur.stock_status === "deducting" ? data.status !== "verified" : !["rejected", "pending", "pending_verification"].includes(data.status))) throw new Error("Retry the interrupted verification or reversal first.");
-      const prev = (busyExpired ? cur.stock_status === "deducting" ? "not_deducted" : "deducted" : cur.stock_status) as StockStatus;
-      if (["shipped", "completed"].includes(data.status) && !["verified", "shipped", "completed"].includes(cur.status)) throw new Error("Verify this order first before marking it shipped or completed.");
-      const action = planStockAction(prev, data.status);
-      if (action === "none" && prev !== "unknown") {
-        const { data: unresolved, error: operationError } = await admin.from("order_pos_operations").select("kind,state,receipt_number,cycle").eq("order_id", data.id).order("cycle", { ascending: false }).order("created_at", { ascending: false }).limit(1);
-        if (operationError) throw new Error(operationError.message);
-        const op = unresolved?.[0];
-        if (op && (["submitting", "uncertain", "receipt_saved"].includes(op.state) || (op.kind === "sale" && op.receipt_number && prev === "not_deducted"))) throw new Error("Finish reconciling the interrupted POS verification or refund before changing this status.");
+    const ctx = context as unknown as Ctx & { claims?: { email?: string } };
+    const admin = await adminClient(ctx);
+    const actor = { _actor: ctx.userId, _actor_email: ctx.claims?.email ?? "" };
+    const conflict = "This order was just changed by someone else. Refresh and try again.";
+    if (data.action !== "verify") {
+      const [from, to] = ORDER_FLOW[data.action];
+      const tracking = data.tracking_number || undefined;
+      if ((data.action === "ship" || data.action === "tracking") && !tracking) throw new Error("Enter a tracking number first.");
+      if (data.action === "reject") {
+        const { data: ops, error: opError } = await admin.from("order_pos_operations").select("kind,state,receipt_number").eq("order_id", data.id).order("cycle", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+        if (opError) throw new Error(opError.message);
+        const op = ops?.[0];
+        if (op && (["submitting", "uncertain", "receipt_saved"].includes(op.state) || (op.kind === "sale" && op.receipt_number))) throw new Error("Finish reconciling the interrupted POS verification before rejecting this order.");
       }
-      if (action !== "none") {
-        let deltas = (cur.stock_deductions ?? []) as StockDelta[];
-        // Atomic claim: only one request can move the order out of `prev`.
-        const claim = crypto.randomUUID();
-        const { data: claimed, error: claimError } = await admin.rpc("claim_order_pos", { _id: data.id, _prev: prev, _busy: action === "deduct" ? "deducting" : "restoring", _claim: claim });
-        if (claimError || !claimed) throw new Error(claimError?.message ?? "This order's stock was just updated elsewhere. Refresh and try again.");
-        const revert = () => admin.from("orders").update({ stock_status: prev, pos_claim_id: null, pos_claim_until: null }).eq("id", data.id).eq("pos_claim_id", claim);
-        try {
-          const { processOrderPos } = await import("./order-pos.server");
-          const result = await processOrderPos(admin, { id: data.id, action, actor: (context as unknown as Ctx).userId, returnToStock: data.return_to_stock, promoThb: data.promo_thb });
-          if (!result.ok) {
-            await revert();
-            if ("shortfall" in result) return { ok: false, shortfall: await describeShortfall(admin, result.shortfall) };
-            return result;
-          }
-          deltas = result.deltas;
-        } catch (err) {
-          await revert();
-          console.error("Loyverse stock update failed", err);
-          throw new Error(err instanceof Error ? err.message : "Loyverse update failed. Status not changed.");
-        }
-        const now = new Date().toISOString();
-        const { error } = await admin.from("orders").update(action === "deduct"
-          ? { ...patch, status: data.status, stock_status: "deducted", stock_deducted_at: now, stock_deductions: deltas, pos_claim_id: null, pos_claim_until: null }
-          : { ...patch, status: data.status, stock_status: "restored", stock_restored_at: now, pos_claim_id: null, pos_claim_until: null }).eq("id", data.id).eq("pos_claim_id", claim);
-        if (error) { await revert(); throw new Error(error.message); }
-        return { ok: true };
-      }
-      patch.status = data.status;
+      const { data: ok, error } = await admin.rpc("transition_order_status", { _id: data.id, _from: from, _to: to, ...actor, ...(tracking ? { _tracking: tracking } : {}) });
+      if (error) throw new Error(error.message);
+      if (!ok) throw new Error(conflict);
+      return { ok: true };
     }
-    const { error } = await admin.from("orders").update(patch).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    // Verify: claim (pending_verification -> verifying) before calling the POS.
+    const claim = crypto.randomUUID();
+    const { data: prev, error: claimError } = await admin.rpc("claim_order_verify", { _id: data.id, _claim: claim });
+    if (claimError) throw new Error(claimError.message);
+    if (!prev) throw new Error(conflict);
+    const revert = () => admin.from("orders").update({ status: "pending_verification", stock_status: prev, pos_claim_id: null, pos_claim_until: null }).eq("id", data.id).eq("pos_claim_id", claim);
+    let deltas: StockDelta[];
+    try {
+      const { processOrderPos } = await import("./order-pos.server");
+      const result = await processOrderPos(admin, { id: data.id, action: "deduct", actor: ctx.userId, promoThb: data.promo_thb });
+      if (!result.ok) {
+        await revert();
+        if ("shortfall" in result) return { ok: false, shortfall: await describeShortfall(admin, result.shortfall) };
+        return result;
+      }
+      deltas = result.deltas;
+    } catch (err) {
+      await revert();
+      console.error("Loyverse verification failed", err);
+      throw new Error(err instanceof Error ? err.message : "Loyverse update failed. Order is back to Pending Verification.");
+    }
+    const { data: op } = await admin.from("order_pos_operations").select("receipt_number").eq("order_id", data.id).eq("kind", "sale").order("cycle", { ascending: false }).limit(1).maybeSingle();
+    const { data: ok, error } = await admin.rpc("transition_order_status", { _id: data.id, _from: "verifying", _to: "verified", ...actor, ...(op?.receipt_number ? { _pos_receipt: op.receipt_number } : {}), _claim: claim, _deltas: deltas as unknown as never });
+    if (error || !ok) { await revert(); throw new Error(error?.message ?? conflict); }
     return { ok: true };
+  });
+
+export type OrderHistoryEntry = { id: string; changed_at: string; changed_by_email: string; from_status: string | null; to_status: string; tracking_number: string | null; old_tracking_number: string | null; pos_receipt_number: string | null; notes: string | null };
+
+export const getOrderHistory = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }): Promise<OrderHistoryEntry[]> => {
+    const admin = await adminClient(context as unknown as Ctx);
+    const { data: rows, error } = await admin.from("order_status_history").select("id,changed_at,changed_by_email,from_status,to_status,tracking_number,old_tracking_number,pos_receipt_number,notes").eq("order_id", data.id).order("changed_at");
+    if (error) throw new Error(error.message);
+    return rows ?? [];
   });
 
 async function describeShortfall(admin: Awaited<ReturnType<typeof adminClient>>, short: { variantId: string; needed: number; available: number }[]) {
