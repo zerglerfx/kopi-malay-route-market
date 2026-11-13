@@ -43,7 +43,7 @@ describe("durable POS receipt flow", () => {
   expect((await verify()).ok).toBe(true); expect((await verify()).ok).toBe(true);
   expect(posts).toBe(1); expect(lv.adjustStock).not.toHaveBeenCalled();
   expect(ops[0].payload.line_items.reduce((s: number, l: any) => s + Math.round(l.price * 100) * l.quantity, 0)).toBe(14700);
-  expect(ops[0].payload.total_discounts).map((d: any) => d.money_amount)).toEqual([7]);
+  expect(ops[0].payload.total_discounts.map((d: any) => d.money_amount)).toEqual([7]);
  });
  it("shortfall prevents a receipt", async () => {
   vi.mocked(lv.fetchLevels).mockResolvedValue([{ variant_id: variant, store_id: "store", in_stock: 2 }]);
