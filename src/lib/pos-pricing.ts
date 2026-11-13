@@ -38,7 +38,7 @@ export function buildReceiptSnapshot(currency: string, lines: { productId: strin
 }
 export const snapshotUnitThb = (s: PosReceiptSnapshot | null, productId: string | null, variant: string) => s?.items.find((x) => x.product_id === productId && x.variant === variant)?.unit_thb ?? null;
 
-export type PosPricedItem = { variantId: string; name: string; size: string; category_slug: string; quantity: number; priceThb: number | null };
+export type PosPricedItem = { variantId: string; name: string; size: string; category_slug: string; quantity: number; priceThb: number | null; locked?: boolean };
 
 /** Integer satang allocation; split a quantity into adjacent unit prices when a penny cannot divide evenly. */
 export function pricedPosLines(items: PosPricedItem[], promo: number) {
@@ -63,8 +63,10 @@ export function pricedPosLines(items: PosPricedItem[], promo: number) {
   const bundleParts = allocate(bundle, items.map((it, i) => it.category_slug === "stickers" && it.name.startsWith("STICKER (8x8cm)") ? gross[i] ?? 0 : 0));
   const bases = gross.map((v, i) => v - (bundleParts[i] ?? 0));
   const base = subtotal - bundle;
-  if (satang(promo) < 0 || satang(promo) > base) throw new Error("THB promo discount exceeds merchandise total.");
-  const promoParts = allocate(satang(promo), bases);
+  const open = bases.map((v, i) => items[i]?.locked ? 0 : v);
+  const openBase = open.reduce((a, b) => a + b, 0);
+  if (satang(promo) < 0 || satang(promo) > openBase) throw new Error("THB promo discount exceeds merchandise total.");
+  const promoParts = allocate(satang(promo), open);
   const lines = items.flatMap((it, i) => {
     const total = (bases[i] ?? 0) - (promoParts[i] ?? 0);
     const low = Math.floor(total / it.quantity), extra = total % it.quantity;
@@ -74,7 +76,7 @@ export function pricedPosLines(items: PosPricedItem[], promo: number) {
       ...(extra > 0 ? [{ ...common, quantity: extra, price: (low + 1) / 100 }] : []),
     ];
   });
-  return { lines, subtotal: subtotal / 100, bundle: bundle / 100, base: base / 100, total: (base - satang(promo)) / 100 };
+  return { lines, subtotal: subtotal / 100, bundle: bundle / 100, base: base / 100, promoBase: openBase / 100, total: (base - satang(promo)) / 100 };
 }
 
 export function posNote(o: { ref: string; cycle: number; currency: string; subtotal: number; sale?: number | undefined; bundle: number; promo: number; code: string | null; shipping: number; total: number; confirmedBy?: string | undefined; promoThb?: number | undefined }) {

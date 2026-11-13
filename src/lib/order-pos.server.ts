@@ -78,11 +78,12 @@ export async function processOrderPos(admin: Admin, input: { id: string; action:
       const p = productsResult.data?.find((x) => x.id === i.product_id);
       const shared = sharedResult.data?.find((x) => x.product_id === i.product_id);
       const link = shared ?? directResult.data?.find((x) => x.product_id === i.product_id && x.size === i.selected_variant);
-      return { variantId: link?.loyverse_variant_id ?? "", name: i.product_name, size: i.selected_variant, category_slug: p?.categories?.slug ?? "", quantity: i.quantity, priceThb: snapshotUnitThb(receiptSnap, i.product_id, i.selected_variant) ?? (p ? effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) : null) };
+      const lockedThb = snapshotUnitThb(receiptSnap, i.product_id, i.selected_variant);
+      return { locked: lockedThb != null, variantId: link?.loyverse_variant_id ?? "", name: i.product_name, size: i.selected_variant, category_slug: p?.categories?.slug ?? "", quantity: i.quantity, priceThb: lockedThb ?? (p ? effectivePriceThb({ price_thb: p.price_thb == null ? null : Number(p.price_thb), sale_price_thb: p.sale_price_thb == null ? null : Number(p.sale_price_thb) }) : null) };
     });
     const priced = pricedPosLines(items, 0);
-    const promo = resolvePosPromo({ currency: order.currency, rmBase: Number(order.subtotal) - Number(order.sticker_bundle_discount), paidDiscount: Number(order.discount_amount), thbBase: priced.base, hasPromo: !!order.promo_code || Number(order.discount_amount) > 0, snapshot: order.promo_snapshot as PromoSnapshot | null, current: promoResult.data ? promoSnapshot(promoResult.data) : null, confirmed: input.promoThb, receiptPromoThb: receiptSnap?.promo_thb ?? null });
-    if (promo.needsConfirmation) return { ok: false, promoConfirmation: { currency: order.currency, paidDiscount: Number(order.discount_amount), maxThb: priced.base } };
+    const promo = resolvePosPromo({ currency: order.currency, rmBase: Number(order.subtotal) - Number(order.sticker_bundle_discount), paidDiscount: Number(order.discount_amount), thbBase: priced.promoBase, hasPromo: !!order.promo_code || Number(order.discount_amount) > 0, snapshot: order.promo_snapshot as PromoSnapshot | null, current: promoResult.data ? promoSnapshot(promoResult.data) : null, confirmed: input.promoThb, receiptPromoThb: receiptSnap?.promo_thb ?? null });
+    if (promo.needsConfirmation) return { ok: false, promoConfirmation: { currency: order.currency, paidDiscount: Number(order.discount_amount), maxThb: priced.promoBase } };
     const final = pricedPosLines(items, promo.discount);
     receiptDeltas = [];
     for (const it of items) {

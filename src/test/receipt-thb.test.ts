@@ -31,3 +31,20 @@ describe("THB off on receipt", () => {
   it("THB orders ignore the box", () => expect(resolvePosPromo({ ...base, currency: "thb", snapshot: pct, receiptPromoThb: 500 }).discount).toBe(10));
   it("no saved value and no snapshot: staff confirmation", () => expect(resolvePosPromo({ ...base, currency: "myr", snapshot: null, receiptPromoThb: null }).needsConfirmation).toBe(true));
 });
+
+describe("THB on receipt is never reduced by promo", () => {
+  it("locked line keeps exact amount; promo goes to other lines", () => {
+    const r = pricedPosLines([
+      { variantId: "w", name: "Wristband", size: "", category_slug: "other", quantity: 2, priceThb: 20, locked: true },
+      { variantId: "m", name: "Magnet", size: "", category_slug: "magnets", quantity: 1, priceThb: 100 },
+    ], 15);
+    expect(r.lines.find((l) => l.variant_id === "w")?.price).toBe(20);
+    expect(r.total).toBe(125);
+    expect(r.promoBase).toBe(100);
+  });
+  it("only locked lines: receipt total stays 40", () => {
+    const r = pricedPosLines([{ variantId: "w", name: "Wristband", size: "", category_slug: "other", quantity: 2, priceThb: 20, locked: true }], 0);
+    expect(r.total).toBe(40);
+    expect(r.promoBase).toBe(0);
+  });
+});
