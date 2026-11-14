@@ -42,11 +42,11 @@ function UsersAdmin() {
                 <td className="px-3 py-2">{u.orders}</td>
                 <td className="px-3 py-2">
                   <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={u.is_admin} onChange={async (e) => {
+                    <input type="checkbox" checked={u.is_admin} disabled={u.is_owner} onChange={async (e) => {
                       try { await save({ data: { user_id: u.id, admin: e.target.checked } }); toast.success("Access updated"); qc.invalidateQueries({ queryKey: ["admin", "users"] }); }
                       catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
                     }} />
-                    {u.is_admin ? "Admin" : "Member"}
+                    {u.is_owner ? "Owner" : u.is_admin ? "Admin" : "Member"}
                   </label>
                 </td>
               </tr>

@@ -327,21 +327,31 @@ export const updateTowing = createServerFn({ method: "POST" }).middleware([requi
   });
 
 // ---------- Users ----------
+/** Owner-only: verify admin + owner role as the caller before using the service client. */
+async function ownerClient(context: Ctx) {
+  const admin = await adminClient(context);
+  const { assertOwner } = await import("./owner-pin.server");
+  await assertOwner(context as never);
+  return admin;
+}
+
 export const listUsers = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
-  const admin = await adminClient(context as unknown as Ctx);
+  const admin = await ownerClient(context as unknown as Ctx);
   const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
   if (error) throw new Error(error.message);
   const [roles, orders, profiles] = await Promise.all([
-    admin.from("user_roles").select("user_id,role").eq("role", "admin"),
+    admin.from("user_roles").select("user_id,role").in("role", ["admin", "owner"]),
     admin.from("orders").select("user_id,guest_email"),
     admin.from("profiles").select("id,full_name,phone,city,state,country,motorcycle_make,motorcycle_model,motorcycle_plate,preferred_contact"),
   ]);
   const prof = new Map((profiles.data ?? []).map((p) => [p.id, p]));
-  const admins = new Set((roles.data ?? []).map((r) => r.user_id));
+  const admins = new Set((roles.data ?? []).filter((r) => r.role === "admin").map((r) => r.user_id));
+  const owners = new Set((roles.data ?? []).filter((r) => r.role === "owner").map((r) => r.user_id));
   return data.users.map((u) => ({
     id: u.id, email: u.email ?? "", created_at: u.created_at, last_sign_in_at: u.last_sign_in_at ?? null,
     provider: (u.app_metadata?.["provider"] as string | undefined) ?? "email",
     is_admin: admins.has(u.id),
+    is_owner: owners.has(u.id),
     profile: prof.get(u.id) ?? null,
     orders: (orders.data ?? []).filter((o) => o.user_id === u.id || (!!u.email && o.guest_email?.toLowerCase() === u.email.toLowerCase())).length,
   }));
@@ -350,8 +360,12 @@ export const listUsers = createServerFn({ method: "POST" }).middleware([requireS
 export const setAdminRole = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
-    const admin = await adminClient(context as unknown as Ctx);
+    const admin = await ownerClient(context as unknown as Ctx);
     if (!data.admin && data.user_id === (context as unknown as Ctx).userId) throw new Error("You can't remove your own admin access");
+    if (!data.admin) {
+      const { data: target } = await admin.from("user_roles").select("role").eq("user_id", data.user_id).eq("role", "owner").maybeSingle();
+      if (target) throw new Error("Owner accounts keep admin access");
+    }
     const res = data.admin
       ? await admin.from("user_roles").upsert({ user_id: data.user_id, role: "admin" }, { onConflict: "user_id,role" })
       : await admin.from("user_roles").delete().eq("user_id", data.user_id).eq("role", "admin");

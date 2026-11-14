@@ -1,5 +1,6 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import { OwnerPinButton } from "@/components/admin/OwnerPinDialog";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -30,11 +31,17 @@ const TABS = [
 ] as const;
 
 function AdminLayout() {
+  const { user } = Route.useRouteContext();
+  const [isOwner, setIsOwner] = useState(false);
+  useEffect(() => {
+    supabase.rpc("has_role", { _user_id: user.id, _role: "owner" }).then(({ data }) => setIsOwner(Boolean(data)));
+  }, [user.id]);
+  const tabs = TABS.filter((t) => t.to !== "/admin/users" || isOwner);
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3"><h1 className="font-display text-3xl font-bold uppercase">Admin dashboard</h1><OwnerPinButton /></div>
       <nav className="mt-4 flex gap-1 overflow-x-auto border-b">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Link key={t.to} to={t.to} activeOptions={{ exact: "exact" in t }} className="whitespace-nowrap border-b-2 border-transparent px-3 py-2 font-display text-sm font-semibold uppercase text-muted-foreground hover:text-foreground [&.active]:border-foreground [&.active]:text-foreground">
             {t.label}
           </Link>
