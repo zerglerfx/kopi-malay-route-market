@@ -6,6 +6,7 @@ import { useCart } from "@/hooks/use-cart";
 import { getOrderByReference } from "@/lib/checkout.functions";
 import { formatMoney } from "@/lib/shop";
 import { SUPPORT_TELEGRAM_URL } from "@/lib/manual-order";
+import { customerStatus } from "@/lib/order-flow";
 
 export const Route = createFileRoute("/order-success")({
   validateSearch: (s: Record<string, unknown>): { ref?: string; t?: string } => ({
@@ -46,8 +47,8 @@ function OrderSuccess() {
       <div className="text-center">
         <p className="text-sm text-muted-foreground">Order reference</p>
         <h1 className="font-display text-4xl font-bold">{order.order_number}</h1>
-        <span className="mt-3 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-accent-foreground">
-          <Clock className="size-4" /> Payment Proof Submitted - Pending Admin Verification
+        <span className={`mt-3 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold ${order.status === "refunded" ? "border border-foreground bg-background text-foreground" : "bg-accent text-accent-foreground"}`}>
+          <Clock className="size-4" /> {customerStatus(order.status)}
         </span>
         <p className="mt-3 text-sm text-muted-foreground">We'll check your payment and confirm by email at {order.email}.</p>
       </div>

@@ -64,16 +64,26 @@ describe("durable POS receipt flow", () => {
   expect((await processOrderPos(client(), { id: "order", action: "restore", actor: "admin" })).ok).toBe(true);
   expect(lv.adjustStock).toHaveBeenCalledWith(expect.anything(), order.stock_deductions, 1); expect(posts).toBe(0);
  });
- it("asks about stock only after shipment", async () => {
-  await verify(); order.status = "shipped";
+ it("requires the owner's stock choice for every reversal", async () => {
+  await verify(); order.status = "verified";
   expect(await processOrderPos(client(), { id: "order", action: "restore", actor: "admin" })).toEqual({ ok: false, returnStockRequired: true });
   expect(posts).toBe(1);
  });
- it("before shipping refunds automatically with return to stock", async () => {
+ it("applies the owner's write-off choice even before shipping", async () => {
   await verify(); order.status = "verified";
   vi.mocked(lv.posRequest).mockResolvedValue({ ...receipt, receipt_number: "6-52330", receipt_type: "REFUND", refund_for: "6-52329" });
+  vi.mocked(lv.writeoffTargets).mockResolvedValue([{ variant_id: variant, store_id: "store", stock_after: 7 }]);
   await processOrderPos(client(), { id: "order", action: "restore", actor: "admin", returnToStock: false });
-  expect(ops[0].return_to_stock).toBe(true); expect(lv.applyWriteoff).not.toHaveBeenCalled();
+  expect(ops[0].return_to_stock).toBe(false); expect(lv.applyWriteoff).toHaveBeenCalledTimes(1);
+ });
+ it("retry after a crash between Loyverse and the status change creates no second refund receipt", async () => {
+  await verify(); order.status = "reversing";
+  vi.mocked(lv.posRequest).mockImplementation(async (_p, body) => { if (body) posts++; return { ...receipt, receipt_number: "6-52330", receipt_type: "REFUND", refund_for: "6-52329" } as any; });
+  await processOrderPos(client(), { id: "order", action: "restore", actor: "admin", returnToStock: true });
+  expect(posts).toBe(2); expect(ops[0].receipt_number).toBe("6-52330");
+  // crash: status never finalised; the retry must reuse the saved receipt
+  expect((await processOrderPos(client(), { id: "order", action: "restore", actor: "admin", returnToStock: true })).ok).toBe(true);
+  expect(posts).toBe(2); expect(ops.filter((o) => o.kind === "refund")).toHaveLength(1);
  });
  it("no-return refund writes inventory off once", async () => {
   await verify(); order.status = "completed";
@@ -86,9 +96,11 @@ describe("durable POS receipt flow", () => {
  it("re-verification starts sale 2 and checks live inventory again", async () => {
   await verify(); order.status = "verified"; order.stock_deducted_at = "2026-11-12T01:00:00Z";
   vi.mocked(lv.posRequest).mockResolvedValue({ ...receipt, receipt_number: "6-52330", receipt_type: "REFUND", refund_for: "6-52329" });
-  await processOrderPos(client(), { id: "order", action: "restore", actor: "admin" });
+  await processOrderPos(client(), { id: "order", action: "restore", actor: "admin", returnToStock: true });
   order.stock_restored_at = "2026-11-12T02:00:00Z"; order.status = "pending";
   vi.mocked(lv.posRequest).mockResolvedValue({ ...receipt, receipt_number: "6-52331" });
   await verify(); expect(ops[0].cycle).toBe(2); expect(ops[0].payload.note).toContain("sale 2"); expect(lv.fetchLevels).toHaveBeenCalledTimes(2);
+  // verify -> undo -> verify keeps every receipt: sale 1, refund 1, fresh sale 2
+  expect(ops.map((o) => `${o.kind}${o.cycle}:${o.receipt_number}`).reverse()).toEqual(["sale1:6-52329", "refund1:6-52330", "sale2:6-52331"]);
  });
 });

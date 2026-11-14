@@ -358,3 +358,77 @@ export const setAdminRole = createServerFn({ method: "POST" }).middleware([requi
     if (res.error) throw new Error(res.error.message);
     return { ok: true };
   });
+
+// ---------- Owner reversals: Undo Verify / Full Refund ----------
+export type ReverseOrderResult = { ok: true } | { ok: false; error: string };
+
+export const reverseOrder = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({
+    id: z.string().uuid(),
+    kind: z.enum(["undo_verify", "refund"]),
+    pin: z.string().regex(/^\d{6}$/, "PIN must be exactly 6 digits"),
+    reason: z.string().trim().min(3, "Reason is required").max(500),
+    bank_reference: z.string().trim().max(120).optional(),
+    return_to_stock: z.boolean(),
+  }).parse(d))
+  .handler(async ({ data, context }): Promise<ReverseOrderResult> => {
+    const ctx = context as unknown as Ctx & { claims?: { email?: string } };
+    const email = ctx.claims?.email ?? "";
+    const { assertOwner, verifyOwnerPin } = await import("./owner-pin.server");
+    const { runReversal } = await import("./order-reverse.server");
+    let admin: Awaited<ReturnType<typeof adminClient>> | null = null;
+    const claim = crypto.randomUUID();
+    const restock = data.return_to_stock;
+    const notes = [
+      data.kind === "refund" ? "Full refund" : "Undo Verify",
+      `Reason: ${data.reason}`,
+      data.bank_reference ? `Bank ref: ${data.bank_reference}` : null,
+      restock ? "Items returned to shop (restocked)" : "Items not returned (inventory write-off)",
+    ].filter(Boolean).join(" · ");
+    const res = await runReversal(data.kind, {
+      assertOwner: async () => { await assertOwner(ctx as never); admin = await adminClient(ctx); },
+      verifyPin: () => verifyOwnerPin(admin!, ctx.userId, data.pin, email),
+      claim: async (allowed) => {
+        const { data: prev, error } = await admin!.rpc("claim_order_reverse", { _id: data.id, _claim: claim, _allowed: allowed });
+        if (error) throw new Error(error.message);
+        return prev;
+      },
+      pos: async () => {
+        const { processOrderPos } = await import("./order-pos.server");
+        return processOrderPos(admin!, { id: data.id, action: "restore", actor: ctx.userId, returnToStock: restock });
+      },
+      release: async () => { await admin!.rpc("release_order_reverse", { _id: data.id, _claim: claim }); },
+      refundReceipt: async () => {
+        const { data: op } = await admin!.from("order_pos_operations").select("receipt_number").eq("order_id", data.id).eq("kind", "refund").order("cycle", { ascending: false }).limit(1).maybeSingle();
+        return op?.receipt_number ?? null;
+      },
+      finish: async (to, receipt) => {
+        const { data: ok, error } = await admin!.rpc("finish_order_reverse", { _id: data.id, _claim: claim, _to: to, _stock: restock ? "restored" : "written_off", _actor: ctx.userId, _actor_email: email, _pos_receipt: receipt ?? "", _notes: notes });
+        if (error) throw new Error(error.message);
+        return !!ok;
+      },
+      notify: async (previous, receipt) => {
+        // Amount is read from the order record on the server, never from the client.
+        const { data: o } = await admin!.from("orders").select("order_number,currency,total_amount").eq("id", data.id).single();
+        const { sendTelegram, escHtml } = await import("./telegram.server");
+        const amount = o ? `${o.currency === "thb" ? "THB" : "RM"} ${Number(o.total_amount).toFixed(2)}` : "";
+        const sent = await sendTelegram([
+          data.kind === "refund" ? `💸 <b>Order refunded: ${escHtml(o?.order_number ?? "")}</b>` : `↩️ <b>Verification undone: ${escHtml(o?.order_number ?? "")}</b>`,
+          `• Owner: ${escHtml(email)}`,
+          `• Previous status: ${escHtml(previous.replace(/_/g, " "))}`,
+          `• Amount: ${amount}`,
+          `• Reason: ${escHtml(data.reason)}`,
+          data.bank_reference ? `• Bank ref: ${escHtml(data.bank_reference)}` : null,
+          `• Stock: ${restock ? "returned to shop" : "written off"}`,
+          receipt ? `• POS refund receipt: ${escHtml(receipt)}` : null,
+        ].filter(Boolean).join("\n"), "reversal");
+        if (!sent) throw new Error("Telegram not delivered");
+      },
+    });
+    if (res.ok) return { ok: true };
+    if ("pin" in res) {
+      const r = res.pin.reason;
+      return { ok: false, error: r === "not_set" ? "Set your Owner PIN first." : r === "locked" ? `PIN locked after 5 wrong tries. Try again after ${new Date(res.pin.lockedUntil ?? "").toLocaleTimeString()}.` : "Wrong PIN. Nothing was changed." };
+    }
+    return { ok: false, error: "Loyverse could not complete this. The order was restored to its previous status." };
+  });

@@ -102,11 +102,11 @@ export async function processOrderPos(admin: Admin, input: { id: string; action:
 
   if (!op && kind === "refund") {
     if (!latestSale?.receipt_number) throw new Error("Original sale receipt missing.");
-    const afterShipment = ["shipped", "completed"].includes(order.status);
-    if (afterShipment && input.returnToStock === undefined) return { ok: false, returnStockRequired: true };
+    // The owner's restock/write-off choice is required for every reversal and saved immutably on the intent.
+    if (input.returnToStock === undefined) return { ok: false, returnStockRequired: true };
     const original = await lv.posRequest<lv.PosReceipt>(`/receipts/${encodeURIComponent(latestSale.receipt_number)}`);
     const payload = { source: source(order.order_number, cycle), line_items: original.line_items.map((l) => ({ id: l.id, quantity: l.quantity })) };
-    const { data: inserted, error: insertError } = await admin.from("order_pos_operations").insert({ order_id: input.id, cycle, kind, original_receipt_number: latestSale.receipt_number, payload: json(payload), total_thb: original.total_money, return_to_stock: afterShipment ? input.returnToStock ?? true : true }).select("*").single();
+    const { data: inserted, error: insertError } = await admin.from("order_pos_operations").insert({ order_id: input.id, cycle, kind, original_receipt_number: latestSale.receipt_number, payload: json(payload), total_thb: original.total_money, return_to_stock: input.returnToStock }).select("*").single();
     if (insertError || !inserted) throw new Error(insertError?.message ?? "Could not save refund intent");
     op = inserted;
   }

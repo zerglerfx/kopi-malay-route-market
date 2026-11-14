@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { customerStatus } from "@/lib/order-flow";
+import { formatMoney } from "@/lib/shop";
 import { CONTACT_OPTIONS, EMPTY_PROFILE, loadMyProfile, type Profile } from "@/lib/profile";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -26,10 +28,13 @@ function ProfilePage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [orders, setOrders] = useState<{ id: string; order_number: string; created_at: string; status: string; currency: string; total_amount: number }[]>([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
     loadMyProfile().then((r) => { if (r) setP(r); setLoading(false); });
+    supabase.from("orders").select("id,order_number,created_at,status,currency,total_amount").order("created_at", { ascending: false }).limit(50)
+      .then(({ data }) => setOrders((data ?? []).map((o) => ({ ...o, total_amount: Number(o.total_amount) }))));
   }, []);
 
   const set = (k: keyof Profile) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setP({ ...p, [k]: e.target.value });
@@ -101,6 +106,22 @@ function ProfilePage() {
         </section>
         <button disabled={busy} className="w-full rounded-md bg-primary py-3 font-display font-semibold uppercase text-primary-foreground hover:opacity-90 disabled:opacity-50">{busy ? "Saving…" : "Save profile"}</button>
       </form>
+      <section className="mt-8 space-y-3 rounded-lg border p-5">
+        <h2 className="font-display text-lg font-bold uppercase">My orders</h2>
+        {!orders.length ? <p className="text-sm text-muted-foreground">No orders yet.</p> : (
+          <ul className="divide-y">
+            {orders.map((o) => (
+              <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <span><span className="font-mono font-semibold">{o.order_number}</span> <span className="text-muted-foreground">· {new Date(o.created_at).toLocaleDateString()}</span></span>
+                <span className="flex items-center gap-3">
+                  <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${o.status === "refunded" ? "border border-foreground" : "bg-accent text-accent-foreground"}`}>{customerStatus(o.status)}</span>
+                  <span className="tabular-nums">{formatMoney(o.total_amount, o.currency)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

@@ -246,6 +246,8 @@ export type Database = {
           pos_claim_id: string | null
           pos_claim_until: string | null
           pos_receipt_snapshot: Json | null
+          pre_claim_status: string | null
+          pre_claim_stock_status: string | null
           promo_code: string | null
           promo_snapshot: Json | null
           receipt_path: string | null
@@ -280,6 +282,8 @@ export type Database = {
           pos_claim_id?: string | null
           pos_claim_until?: string | null
           pos_receipt_snapshot?: Json | null
+          pre_claim_status?: string | null
+          pre_claim_stock_status?: string | null
           promo_code?: string | null
           promo_snapshot?: Json | null
           receipt_path?: string | null
@@ -314,6 +318,8 @@ export type Database = {
           pos_claim_id?: string | null
           pos_claim_until?: string | null
           pos_receipt_snapshot?: Json | null
+          pre_claim_status?: string | null
+          pre_claim_stock_status?: string | null
           promo_code?: string | null
           promo_snapshot?: Json | null
           receipt_path?: string | null
@@ -742,6 +748,10 @@ export type Database = {
         Args: { _busy: string; _claim: string; _id: string; _prev: string }
         Returns: boolean
       }
+      claim_order_reverse: {
+        Args: { _allowed: string[]; _claim: string; _id: string }
+        Returns: string
+      }
       claim_order_verify: {
         Args: { _claim: string; _id: string }
         Returns: string
@@ -753,6 +763,19 @@ export type Database = {
           _email_verified: boolean
           _identity_email: string
           _provider: string
+        }
+        Returns: boolean
+      }
+      finish_order_reverse: {
+        Args: {
+          _actor: string
+          _actor_email: string
+          _claim: string
+          _id: string
+          _notes: string
+          _pos_receipt: string
+          _stock: string
+          _to: string
         }
         Returns: boolean
       }
@@ -769,6 +792,10 @@ export type Database = {
       }
       redeem_promo_code: { Args: { _code: string }; Returns: boolean }
       register_owner_pin_failure: { Args: { _user: string }; Returns: string }
+      release_order_reverse: {
+        Args: { _claim: string; _id: string }
+        Returns: boolean
+      }
       transition_order_status: {
         Args: {
           _actor: string

@@ -4,9 +4,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, ImagePlus, QrCode, Trash2 } from "lucide-react";
-import { type OrderAction } from "@/lib/order-flow";
+import { canRefund, canUndoVerify, salesTotals, type OrderAction } from "@/lib/order-flow";
+import { getOwnerPinStatus } from "@/lib/owner.functions";
 import { QRCodeSVG } from "qrcode.react";
-import { exportOrdersCsv, getOrderHistory, listOrders, markOrderStock, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
+import { exportOrdersCsv, getOrderHistory, listOrders, markOrderStock, reverseOrder, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
 import { STOCK_LABEL } from "@/lib/order-stock";
 import { filterOrders, fullAddress, itemsText, money, orderTotals, statusOptions, type AdminOrderRow, type OrderFilters } from "@/lib/admin-csv";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -106,6 +107,7 @@ function OrdersAdmin() {
         <label className="flex items-center gap-1 text-xs">To<input type="date" value={filters.to ?? ""} onChange={(e) => setF("to", e.target.value)} className="rounded-md border bg-card px-2 py-1.5 text-sm" /></label>
         {Object.values(filters).some(Boolean) && <button onClick={() => setFilters({})} className="text-xs underline">Clear</button>}
         <span className="text-sm text-muted-foreground">{rows.length} orders</span>
+        <SalesSummary rows={rows} />
         <button onClick={() => void exportCsv()} disabled={!rows.length || exporting} className="ml-auto flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"><Download className="size-4" /> {exporting ? "Exporting…" : "Export to Excel / CSV"}</button>
       </div>
       {isLoading ? <p className="mt-6 text-muted-foreground">Loading orders…</p> : (
@@ -197,6 +199,7 @@ function OrdersAdmin() {
               <div>Tracking no.: {details.tracking_number ?? "—"}</div>
               {details.label_url && <img src={details.label_url} alt={`Courier label for ${details.order_number}`} className="max-h-48 rounded border object-contain" />}
             </div>
+            <OwnerActions o={details} onDone={() => { setDetails(null); void qc.invalidateQueries({ queryKey: ["admin"] }); }} />
             <History id={details.id} />
           </div>}
         </DialogContent>
@@ -289,6 +292,64 @@ function LabelDrop({ busy, hasLabel, progress, error, onFile }: { busy: boolean;
       </label>
       {progress && <div className="mt-1 text-xs"><div className="truncate">{progress.name} · {progress.pct < 100 ? "Uploading…" : "Done"}</div><div className="mt-0.5 h-1.5 overflow-hidden rounded bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${progress.pct}%` }} /></div></div>}
       {error && <p role="alert" className="mt-1 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/** Sales counter: refunded, rejected and in-progress reversals never count toward revenue. */
+function SalesSummary({ rows }: { rows: AdminOrder[] }) {
+  const t = salesTotals(rows);
+  return <span className="text-sm">Sales: <b>{t.count}</b> · {money("myr", t.myr)} · {money("thb", t.thb)}</span>;
+}
+
+function OwnerActions({ o, onDone }: { o: AdminOrder; onDone: () => void }) {
+  const statusFn = useServerFn(getOwnerPinStatus);
+  const { data: owner } = useQuery({ queryKey: ["owner-pin-status"], queryFn: () => statusFn() });
+  const [kind, setKind] = useState<"undo_verify" | "refund" | null>(null);
+  if (!owner?.isOwner || (!canUndoVerify(o.status) && !canRefund(o.status))) return null;
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="font-semibold">Owner actions</div>
+      <div className="flex flex-wrap gap-2">
+        {canUndoVerify(o.status) && <Button size="sm" variant="outline" onClick={() => setKind("undo_verify")}>Undo Verify</Button>}
+        {canRefund(o.status) && <Button size="sm" variant="destructive" onClick={() => setKind("refund")}>Refund Order</Button>}
+      </div>
+      {kind && <ReverseForm o={o} kind={kind} onCancel={() => setKind(null)} onDone={onDone} />}
+    </div>
+  );
+}
+
+function ReverseForm({ o, kind, onCancel, onDone }: { o: AdminOrder; kind: "undo_verify" | "refund"; onCancel: () => void; onDone: () => void }) {
+  const run = useServerFn(reverseOrder);
+  const [reason, setReason] = useState("");
+  const [bank, setBank] = useState("");
+  const [restock, setRestock] = useState(true);
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const field = "w-full rounded-md border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
+  const submit = async () => {
+    if (busy) return;
+    if (reason.trim().length < 3) return setErr("Reason is required.");
+    if (!/^\d{6}$/.test(pin)) return setErr("Enter your 6-digit Owner PIN.");
+    setBusy(true); setErr("");
+    try {
+      const r = await run({ data: { id: o.id, kind, pin, reason: reason.trim(), bank_reference: bank.trim() || undefined, return_to_stock: restock } });
+      if (r.ok) { toast.success(kind === "refund" ? `${o.order_number} refunded` : `${o.order_number} moved back to Pending Verification`); onDone(); }
+      else { setErr(r.error); setPin(""); }
+    } catch (e) { setErr(e instanceof Error ? e.message : "Something went wrong"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-2 border-t pt-2">
+      <p className="text-xs text-muted-foreground">{kind === "refund" ? "Full refund. Status becomes Refunded and cannot change again. A Loyverse refund receipt is created." : "The order goes back to Pending Verification. A Loyverse refund receipt is created; verifying again makes a fresh sale receipt."}</p>
+      {kind === "refund" && <div className="flex justify-between text-sm"><span>Refund amount</span><b>{money(o.currency, o.total_amount)}</b></div>}
+      <label className="block text-xs">Reason (required)<input className={field} value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} /></label>
+      {kind === "refund" && <label className="block text-xs">Bank reference (optional)<input className={field} value={bank} maxLength={120} onChange={(e) => setBank(e.target.value)} /></label>}
+      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} />Items returned to shop (unchecked = inventory write-off)</label>
+      <label className="block text-xs">Owner PIN<input className={`${field} font-mono tracking-widest`} type="password" inputMode="numeric" autoComplete="off" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} /></label>
+      {err && <p className="text-xs text-destructive">{err}</p>}
+      <div className="flex gap-2"><Button size="sm" variant={kind === "refund" ? "destructive" : "default"} disabled={busy} onClick={() => void submit()}>{busy ? "Working…" : kind === "refund" ? "Confirm refund" : "Confirm Undo Verify"}</Button><Button size="sm" variant="ghost" disabled={busy} onClick={onCancel}>Cancel</Button></div>
     </div>
   );
 }
