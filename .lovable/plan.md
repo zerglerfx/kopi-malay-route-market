@@ -29,3 +29,12 @@ Today staff/owner-placed orders are counted in the sales totals — the counter 
 - `loadOrders` selects `user_id`, attaches `placed_by` via one `user_roles` query; `FilterSchema` gains optional `placed_by` used only by the list filter (CSV columns untouched).
 - History query adds `changed_by`, attaches `actor_role`.
 - Tests (`src/test/roles.test.ts`, plus admin-role test): badge per kind incl. multi-role; chip counts equal filtered list lengths; non-owner calling the users list is rejected; order badge for guest, customer and staff-placed orders; deleted or role-less accounts give no badge and no error.
+
+## 4. Role changes log (Users tab, owner-only, read-only)
+- "Role changes" sub-tab next to the user list, shown to owners only.
+- Each entry: date and time, "Staff access granted" / "Staff access removed", affected email, acting email with Owner badge. Newest first.
+- Email search (affected or acting), All / Granted / Removed filter, total count, "Load more" every 25.
+- Deleted accounts show "Deleted account"; entry stays, never errors. Log rows are never modified.
+- Stacked cards on phones, no sideways scrolling; table-like rows on desktop.
+- Loaded only through a new read-only server function that re-checks the owner role on every call; the log table keeps no browser access and no create/edit/delete function is added.
+- Tests: staff and customer rejected; newest first; search + filter combined; deleted account label; module exposes only a read function for the log.
