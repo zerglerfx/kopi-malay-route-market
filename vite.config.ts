@@ -18,11 +18,13 @@ export default defineConfig({
       },
     }],
     resolve: {
-      alias: {
-        "entities/lib/decode.js": path.resolve(process.cwd(), "node_modules/entities/lib/decode.js"),
-        "entities/lib/encode.js": path.resolve(process.cwd(), "node_modules/entities/lib/encode.js"),
-        entities: path.resolve(process.cwd(), "node_modules/entities"),
-      },
+      // Match only legacy entry points: modern htmlparser2 must resolve its
+      // own entities/decode export instead of rewriting it to a v4 file path.
+      alias: [
+        { find: /^entities\/lib\/decode\.js$/, replacement: path.resolve(process.cwd(), "node_modules/entities/lib/esm/decode.js") },
+        { find: /^entities\/lib\/encode\.js$/, replacement: path.resolve(process.cwd(), "node_modules/entities/lib/esm/encode.js") },
+        { find: /^entities$/, replacement: path.resolve(process.cwd(), "node_modules/entities/lib/esm/index.js") },
+      ],
     },
   },
   tanstackStart: {
