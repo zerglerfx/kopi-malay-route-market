@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { customerStatus } from "@/lib/order-flow";
 import { formatMoney, MY_STATES, TH_PROVINCES } from "@/lib/shop";
+import { PlacePicker } from "@/components/PlacePicker";
 import { CONTACT_OPTIONS, EMPTY_PROFILE, loadMyProfile, type Profile } from "@/lib/profile";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -87,10 +88,7 @@ function ProfilePage() {
             {input("city", "City")}
             <div className="space-y-1.5">
               <label htmlFor="pf-state" className="text-sm font-medium">{p.country === "thailand" ? "Province" : "State"}</label>
-              <select id="pf-state" value={p.state} onChange={set("state")} className={field}>
-                <option value="">{p.country === "thailand" ? "Choose province" : "Choose state"}</option>
-                {(p.country === "thailand" ? TH_PROVINCES : MY_STATES).map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <PlacePicker id="pf-state" value={p.state} options={p.country === "thailand" ? TH_PROVINCES : MY_STATES} onValueChange={(v) => setP((prev) => ({ ...prev, state: v }))} placeholder={p.country === "thailand" ? "Type to search province" : "Type to search state"} className={field} />
             </div>
             {input("postcode", "Postcode")}
             <div className="space-y-1.5">

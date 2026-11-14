@@ -14,6 +14,7 @@ import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
 import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, TH_PROVINCES, profileToCheckout, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country , saleSavingUnit } from "@/lib/shop";
 import { stickerBundle } from "@/lib/sticker-bundle";
+import { PlacePicker } from "@/components/PlacePicker";
 import { loadMyProfile } from "@/lib/profile";
 
 export const Route = createFileRoute("/checkout/")({
@@ -185,13 +186,7 @@ function Checkout() {
               <div className="space-y-1.5"><label htmlFor="checkout-city" className="text-sm font-medium">City *</label>
                 <input {...inputProps("city")} autoComplete="address-level2" maxLength={100} placeholder="City" value={f.city} onChange={set("city")} />{errorPrompt("city")}</div>
               <div className="space-y-1.5"><label htmlFor="checkout-state" className="text-sm font-medium">{country === "Malaysia" ? "State" : "Province / Region"} *</label>
-                {country === "Malaysia" ? <select {...inputProps("state")} autoComplete="address-level1" value={f.state} onChange={set("state")} aria-label="State">
-                  <option value="">State</option>
-                  {MY_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select> : <select {...inputProps("state")} autoComplete="address-level1" value={f.state} onChange={set("state")} aria-label="Province">
-                  <option value="">Province</option>
-                  {TH_PROVINCES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>}{errorPrompt("state")}</div>
+                {(() => { const { onBlur, ...props } = inputProps("state"); return <PlacePicker {...props} onBlur={onBlur} aria-label={country === "Malaysia" ? "State" : "Province"} placeholder={country === "Malaysia" ? "Type to search state" : "Type to search province"} value={f.state} options={country === "Malaysia" ? MY_STATES : TH_PROVINCES} onValueChange={(v) => setF((prev) => ({ ...prev, state: v }))} />; })()}{errorPrompt("state")}</div>
               <div className="space-y-1.5"><label htmlFor="checkout-postcode" className="text-sm font-medium">Postcode *</label>
                 <input {...inputProps("postcode")} autoComplete="postal-code" maxLength={5} placeholder="Postcode" inputMode="numeric" value={f.postcode} onChange={set("postcode")} />{errorPrompt("postcode")}</div>
             </div>

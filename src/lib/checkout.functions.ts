@@ -230,6 +230,20 @@ export const submitManualOrder = createServerFn({ method: "POST" })
       console.error("Telegram notification failed", e);
     }
 
+    if (!userId) {
+      // Guests have no account history, so email them their private status link. Never blocks the order.
+      try {
+        const { sendTemplateEmail } = await import("./email-templates/send-email");
+        const link = `https://kopimalay.com/order-success?ref=${encodeURIComponent(order.order_number)}&t=${token}`;
+        await sendTemplateEmail("order-received", data.email, {
+          templateData: { name: data.name, orderNumber: order.order_number, total: formatMoney(total, currency), link },
+          idempotencyKey: `order-received-${order.id}`,
+        });
+      } catch (e) {
+        console.error("Order confirmation email failed", e);
+      }
+    }
+
     return { ref: order.order_number, token };
   });
 
