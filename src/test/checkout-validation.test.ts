@@ -34,3 +34,13 @@ describe("mandatory checkout details", () => {
     }
   });
 });
+import { profileToCheckout } from "@/lib/shop";
+describe("profile prefill", () => {
+  const base = { full_name: "A", phone: "0123", address: "x", city: "c", postcode: "12345" };
+  it("maps a Thai profile with its province", () => {
+    expect(profileToCheckout({ ...base, country: "thailand", state: "Tak" })).toMatchObject({ country: "Thailand", state: "Tak" });
+  });
+  it("drops a state that doesn't belong to the country", () => {
+    expect(profileToCheckout({ ...base, country: "malaysia", state: "Tak" }).state).toBe("");
+  });
+});

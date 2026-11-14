@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { customerStatus } from "@/lib/order-flow";
-import { formatMoney } from "@/lib/shop";
+import { formatMoney, MY_STATES, TH_PROVINCES } from "@/lib/shop";
 import { CONTACT_OPTIONS, EMPTY_PROFILE, loadMyProfile, type Profile } from "@/lib/profile";
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -85,11 +85,17 @@ function ProfilePage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             {input("city", "City")}
-            {input("state", "State / Province")}
+            <div className="space-y-1.5">
+              <label htmlFor="pf-state" className="text-sm font-medium">{p.country === "thailand" ? "Province" : "State"}</label>
+              <select id="pf-state" value={p.state} onChange={set("state")} className={field}>
+                <option value="">{p.country === "thailand" ? "Choose province" : "Choose state"}</option>
+                {(p.country === "thailand" ? TH_PROVINCES : MY_STATES).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
             {input("postcode", "Postcode")}
             <div className="space-y-1.5">
               <label htmlFor="pf-country" className="text-sm font-medium">Country</label>
-              <select id="pf-country" value={p.country} onChange={set("country")} className={field}>
+              <select id="pf-country" value={p.country} onChange={(e) => setP({ ...p, country: e.target.value, state: "" })} className={field}>
                 <option value="malaysia">Malaysia</option>
                 <option value="thailand">Thailand</option>
               </select>

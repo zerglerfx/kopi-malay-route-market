@@ -97,6 +97,25 @@ export const MY_STATES = [
   "Pahang", "Penang", "Perak", "Perlis", "Putrajaya", "Sabah", "Sarawak", "Selangor", "Terengganu",
 ] as const;
 
+export const TH_PROVINCES = [
+  "Amnat Charoen", "Ang Thong", "Bangkok", "Bueng Kan", "Buriram", "Chachoengsao", "Chai Nat", "Chaiyaphum", "Chanthaburi",
+  "Chiang Mai", "Chiang Rai", "Chonburi", "Chumphon", "Kalasin", "Kamphaeng Phet", "Kanchanaburi", "Khon Kaen", "Krabi",
+  "Lampang", "Lamphun", "Loei", "Lopburi", "Mae Hong Son", "Maha Sarakham", "Mukdahan", "Nakhon Nayok", "Nakhon Pathom",
+  "Nakhon Phanom", "Nakhon Ratchasima", "Nakhon Sawan", "Nakhon Si Thammarat", "Nan", "Narathiwat", "Nong Bua Lamphu",
+  "Nong Khai", "Nonthaburi", "Pathum Thani", "Pattani", "Phang Nga", "Phatthalung", "Phayao", "Phetchabun", "Phetchaburi",
+  "Phichit", "Phitsanulok", "Phra Nakhon Si Ayutthaya", "Phrae", "Phuket", "Prachinburi", "Prachuap Khiri Khan", "Ranong",
+  "Ratchaburi", "Rayong", "Roi Et", "Sa Kaeo", "Sakon Nakhon", "Samut Prakan", "Samut Sakhon", "Samut Songkhram", "Saraburi",
+  "Satun", "Sing Buri", "Sisaket", "Songkhla", "Sukhothai", "Suphan Buri", "Surat Thani", "Surin", "Tak", "Trang", "Trat",
+  "Ubon Ratchathani", "Udon Thani", "Uthai Thani", "Uttaradit", "Yala", "Yasothon",
+] as const;
+
+/** Map a saved profile address onto checkout fields; drops a state that doesn't belong to the country. */
+export function profileToCheckout(p: { full_name: string; phone: string; address: string; city: string; state: string; postcode: string; country: string }) {
+  const country: Country = p.country?.toLowerCase() === "thailand" ? "Thailand" : "Malaysia";
+  const list: readonly string[] = country === "Malaysia" ? MY_STATES : TH_PROVINCES;
+  return { country, name: p.full_name, phone: p.phone, address: p.address, city: p.city, postcode: p.postcode, state: list.includes(p.state) ? p.state : "" };
+}
+
 const EAST = new Set(["Sabah", "Sarawak", "Labuan"]);
 
 export function isEastMalaysia(state: string): boolean {

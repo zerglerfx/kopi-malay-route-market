@@ -12,8 +12,9 @@ import { useNavigate } from "@tanstack/react-router";
 import qrAsset from "@/assets/qr-touch-n-go.jpeg.asset.json";
 import thaiQrAsset from "@/assets/qr-thai-promptpay.jpg.asset.json";
 import { checkoutErrors, type CheckoutField } from "@/lib/checkout-validation";
-import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country , saleSavingUnit } from "@/lib/shop";
+import { destinationPrice, eastMalaysiaSurcharge, formatMoney, formatParcelWeight, parcelWeight, imageFor, MY_STATES, TH_PROVINCES, profileToCheckout, shippingFee, malaysiaShippingBreakdown, thailandTumblerShipping, type Country , saleSavingUnit } from "@/lib/shop";
 import { stickerBundle } from "@/lib/sticker-bundle";
+import { loadMyProfile } from "@/lib/profile";
 
 export const Route = createFileRoute("/checkout/")({
   loader: ({ context }) => context.queryClient.ensureQueryData(productsQuery),
@@ -99,6 +100,20 @@ function Checkout() {
 
   useEffect(() => { if (cancelled) toast.warning("Payment was cancelled — your cart is still saved."); }, [cancelled]);
   useEffect(() => { const email = user?.email; if (email) setF((p) => (p.email ? p : { ...p, email })); }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    loadMyProfile().then((prof) => {
+      if (!live || !prof) return;
+      const saved = profileToCheckout(prof);
+      setF((prev) => {
+        if (prev.name || prev.phone || prev.address || prev.city || prev.state || prev.postcode) return prev; // never overwrite typing
+        setCountry(saved.country);
+        return { ...prev, name: saved.name, phone: saved.phone, address: saved.address, city: saved.city, state: saved.state, postcode: saved.postcode };
+      });
+    });
+    return () => { live = false; };
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((prev) => ({ ...prev, [k]: e.target.value }));
 
@@ -173,7 +188,10 @@ function Checkout() {
                 {country === "Malaysia" ? <select {...inputProps("state")} autoComplete="address-level1" value={f.state} onChange={set("state")} aria-label="State">
                   <option value="">State</option>
                   {MY_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select> : <input {...inputProps("state")} autoComplete="address-level1" maxLength={100} aria-label="Province" placeholder="Province" value={f.state} onChange={set("state")} />}{errorPrompt("state")}</div>
+                </select> : <select {...inputProps("state")} autoComplete="address-level1" value={f.state} onChange={set("state")} aria-label="Province">
+                  <option value="">Province</option>
+                  {TH_PROVINCES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>}{errorPrompt("state")}</div>
               <div className="space-y-1.5"><label htmlFor="checkout-postcode" className="text-sm font-medium">Postcode *</label>
                 <input {...inputProps("postcode")} autoComplete="postal-code" maxLength={5} placeholder="Postcode" inputMode="numeric" value={f.postcode} onChange={set("postcode")} />{errorPrompt("postcode")}</div>
             </div>
