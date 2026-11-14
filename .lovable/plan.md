@@ -1,45 +1,28 @@
-# Part 2 — Step 1 only: Owner role, PIN, email code, alerts
+# Owner / Staff / Customer labels in admin
 
-Refund and Undo Verify are built in Step 2, after you test Step 1. Your 9 changes are recorded below for Step 2 as well.
+Display and labels only. No database roles, permissions, access rules, totals, sales counter, CSV or stock logic change.
 
-## Decision needed before building: how the email code is sent
+## 1. Users tab (still owner-only)
+- One role badge per user: Owner, Staff (Admin) or Customer — highest role wins (Owner > Staff > Customer).
+- Filter chips with counts: All, Owners, Staff, Customers. Search keeps working together with the chip.
+- Sorted Owners, then Staff, then Customers; newest sign-up first within each group. Shows email and sign-up date.
+- Checkbox renamed "Staff access (Admin)". Owners show a read-only "Owner" label (unchangeable, as now). Confirmed-email rule stays.
+- Role is computed on the server inside the existing owner-only users list call; the page only displays it.
 
-Checked: this project has **no email sending domain set up**. Sign-in emails use a default sender that only sends sign-in-type emails, so it cannot send a custom "your PIN code" email.
+## 2. Orders tab and order details popup
+- Small badge per order: Owner / Staff / Customer (placed from a signed-in account with that highest role) or Guest (no account).
+- New "Placed by" filter: All, Guest, Customer, Staff, Owner. Works alongside existing filters.
+- Badge is worked out on the server when orders are loaded (order's account id checked against roles), not in the browser.
 
-Two honest options:
+## 3. Order timeline
+- Each history entry shows an Owner or Staff badge next to the actor's email, looked up on the server from the actor's account id.
 
-1. **Set up your own email domain (recommended)** — e.g. `notify.kopimalay.shop`. You add a few DNS records once. Then we send a branded "Owner PIN code" email from the store, we generate the 6-digit code ourselves, store only its peppered hash, and enforce exactly: 10-minute expiry, single use, 3 wrong tries, 5 requests per hour.
-2. **Reuse the sign-in "confirm it's you" code** — no domain needed, but the email looks like a generic account email, and the sending limit is the sign-in system's (shared with sign-ups and password resets), so I can't guarantee "5 per hour" — it may be lower.
-
-I will not build until you pick one.
-
-## Security finding (change 7)
-
-- `kopimalay22@gmail.com`: already safe — granted only after a confirmed account with a verified Google identity.
-- `zerglerfx@gmail.com`: **not safe today** — admin is granted the moment an account with that email is created, before confirmation. Fix: move it to the same rule (confirmed email + verified Google identity), applied at sign-in. Owner role uses the same rule for both emails.
-- I could not read the hosted "require email confirmation" setting directly; the fix above makes owner/admin safe regardless of that setting.
-
-## Step 1 build
-
-- **Owner role** added alongside admin; granted to both emails by the safe rule above. Regular admins cannot set PINs, refund, or undo.
-- **PIN**: exactly 6 digits. Hashed with PBKDF2 + per-PIN salt + a secret pepper stored in project secrets (not the database). Same pepper on email-code hashes.
-- **Lockout**: failed attempts counted in one atomic database update; 5 fails = 15-minute lock + Telegram security alert. Wrong PIN changes nothing else.
-- **Tables** for PINs and codes: RLS on, no client access at all, server-only.
-- **Owner PIN window** in the admin header: shows "PIN set / not set" → Send code → enter code → new PIN → confirm.
-- **Telegram**: alert after a PIN is set/reset, and on lockout. Codes are never sent to Telegram.
-- **Tests**: admin-only account rejected; wrong PIN changes nothing; lockout at 5; code expiry/single use/5-per-hour limit; PIN must be exactly 6 digits.
-
-## Step 2 (after your test) — recorded, not built yet
-
-- Full refunds only: amount read-only from the order.
-- Undo Verify lives in the order details popup next to Refund, needs a reason, logged in the timeline, Telegram alert.
-- Order of operations: owner role + PIN → claim order with conditional status update → Loyverse. On Loyverse failure: restore status, no history row. Double-click can never create two refund receipts.
-- Refunded orders excluded from sales totals (kept in list + CSV); "Refunded" shown on the order success page and the customer's account order history.
-- Tests: second refund blocked, admin-only rejected, wrong PIN changes nothing, Loyverse failure restores status.
+## Answer to include in the summary
+Today staff/owner-placed orders are counted in the sales totals — the counter only skips Refunded, Rejected and in-progress reversals. This stays unchanged.
 
 ## Technical details
-
-- Migration: `owner` enum value (separate migration before use), `owner_pins`, `owner_pin_codes` (RLS on, service_role grants only), atomic `register_pin_failure` / `consume_pin_code` SQL functions, updated sign-in grant trigger for both emails; remove insert-time grant in `grant_first_admin`.
-- Secret: `OWNER_PIN_PEPPER` via generate_secret.
-- `src/lib/owner-pin.server.ts` (hash/verify via Web Crypto, workerd-safe), new owner functions in `admin.functions.ts` re-checking `has_role(owner)` as caller.
-- Option 1 also: email domain setup + one "owner-pin-code" app email template.
+- New browser-safe helper `src/lib/roles.ts`: `highestRole(roles)`, `orderPlacer(userId, rolesMap)`, `ROLE_ORDER`, `roleCounts(users)`.
+- `listUsers` returns `role` and `created_at`, sorted server-side; `is_admin`/`is_owner` kept for the checkbox.
+- `loadOrders` selects `user_id`, attaches `placed_by` via one `user_roles` query; `FilterSchema` gains optional `placed_by` used only by the list filter (CSV columns untouched).
+- History query adds `changed_by`, attaches `actor_role`.
+- Tests (`src/test/roles.test.ts`, plus admin-role test): badge per kind incl. multi-role; chip counts equal filtered list lengths; non-owner calling the users list is rejected; order badge for guest, customer and staff-placed orders.
