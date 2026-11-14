@@ -211,6 +211,13 @@
       "when": 1794644395080,
       "tag": "0029_allow_refund_written_off_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794660489326,
+      "tag": "0030_admin_role_audit",
+      "breakpoints": true
     }
   ]
 }

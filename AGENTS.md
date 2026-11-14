@@ -37,3 +37,4 @@
 - Owner PIN: owner role (granted at verified Google sign-in) gates PIN/refund/undo; PIN = PBKDF2 + salt + `OWNER_PIN_PEPPER` secret, email codes issued/checked and failures counted only by service-only SQL functions, so limits are atomic and the browser has no access.
 - Await PIN Telegram alerts before responding to prevent cancelled delivery.
 - Owner reversals go through `runReversal` (order-reverse.server.ts): role → PIN → claim → POS → one-transaction finish → best-effort alert; failures release the claim.
+- Admin role changes go through `runSetAdminRole` (admin-role.server.ts) and the service-only `set_admin_role_audited` SQL function, which writes the role and its append-only `admin_role_audit` row in one transaction; alerts are best-effort.

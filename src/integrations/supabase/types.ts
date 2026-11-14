@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_role_audit: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string
+          changed_by_email: string
+          id: string
+          target_email: string
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by: string
+          changed_by_email?: string
+          id?: string
+          target_email?: string
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string
+          changed_by_email?: string
+          id?: string
+          target_email?: string
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string
@@ -794,6 +824,16 @@ export type Database = {
       register_owner_pin_failure: { Args: { _user: string }; Returns: string }
       release_order_reverse: {
         Args: { _claim: string; _id: string }
+        Returns: boolean
+      }
+      set_admin_role_audited: {
+        Args: {
+          _actor: string
+          _actor_email: string
+          _grant: boolean
+          _target: string
+          _target_email: string
+        }
         Returns: boolean
       }
       transition_order_status: {

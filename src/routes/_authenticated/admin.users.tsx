@@ -25,7 +25,7 @@ function UsersAdmin() {
       <div className="mt-4 overflow-x-auto rounded-md border">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-muted text-left font-display text-xs uppercase">
-            <tr>{["Email", "Name", "Phone", "Region", "Motorcycle", "Contact", "Sign-in", "Joined", "Last sign-in", "Orders", "Admin"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
+            <tr>{["Email", "Name", "Phone", "Region", "Motorcycle", "Contact", "Sign-in", "Joined", "Last sign-in", "Orders", "Email", "Admin"].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((u) => (
@@ -41,8 +41,11 @@ function UsersAdmin() {
                 <td className="px-3 py-2">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString() : "—"}</td>
                 <td className="px-3 py-2">{u.orders}</td>
                 <td className="px-3 py-2">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={u.is_admin} disabled={u.is_owner} onChange={async (e) => {
+                  <span className={u.email_confirmed ? "rounded border px-2 py-0.5 text-xs" : "rounded border border-dashed px-2 py-0.5 text-xs text-muted-foreground"}>{u.email_confirmed ? "Confirmed" : "Unconfirmed"}</span>
+                </td>
+                <td className="px-3 py-2">
+                  <label title={!u.email_confirmed && !u.is_admin ? "Email must be confirmed first" : undefined} className="flex items-center gap-2">
+                    <input type="checkbox" checked={u.is_admin} disabled={u.is_owner || (!u.is_admin && !u.email_confirmed)} onChange={async (e) => {
                       try { await save({ data: { user_id: u.id, admin: e.target.checked } }); toast.success("Access updated"); qc.invalidateQueries({ queryKey: ["admin", "users"] }); }
                       catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
                     }} />

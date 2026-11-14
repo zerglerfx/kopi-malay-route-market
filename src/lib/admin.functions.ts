@@ -352,6 +352,7 @@ export const listUsers = createServerFn({ method: "POST" }).middleware([requireS
     provider: (u.app_metadata?.["provider"] as string | undefined) ?? "email",
     is_admin: admins.has(u.id),
     is_owner: owners.has(u.id),
+    email_confirmed: !!u.email_confirmed_at,
     profile: prof.get(u.id) ?? null,
     orders: (orders.data ?? []).filter((o) => o.user_id === u.id || (!!u.email && o.guest_email?.toLowerCase() === u.email.toLowerCase())).length,
   }));
@@ -360,17 +361,28 @@ export const listUsers = createServerFn({ method: "POST" }).middleware([requireS
 export const setAdminRole = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
-    const admin = await ownerClient(context as unknown as Ctx);
-    if (!data.admin && data.user_id === (context as unknown as Ctx).userId) throw new Error("You can't remove your own admin access");
-    if (!data.admin) {
-      const { data: target } = await admin.from("user_roles").select("role").eq("user_id", data.user_id).eq("role", "owner").maybeSingle();
-      if (target) throw new Error("Owner accounts keep admin access");
-    }
-    const res = data.admin
-      ? await admin.from("user_roles").upsert({ user_id: data.user_id, role: "admin" }, { onConflict: "user_id,role" })
-      : await admin.from("user_roles").delete().eq("user_id", data.user_id).eq("role", "admin");
-    if (res.error) throw new Error(res.error.message);
-    return { ok: true };
+    const ctx = context as unknown as Ctx & { claims?: { email?: string } };
+    const { runSetAdminRole } = await import("./admin-role.server");
+    const { sendTelegram, escHtml } = await import("./telegram.server");
+    let admin: Awaited<ReturnType<typeof ownerClient>> | null = null;
+    const actorEmail = ctx.claims?.email ?? "";
+    let targetEmail = "";
+    return runSetAdminRole({ actorId: ctx.userId, actorEmail: escHtml(actorEmail), targetId: data.user_id, grant: data.admin }, {
+      assertOwner: async () => { admin = await ownerClient(ctx); },
+      getTarget: async (id) => {
+        const { data: u, error } = await admin!.auth.admin.getUserById(id);
+        if (error || !u.user) return null;
+        const { data: o } = await admin!.from("user_roles").select("role").eq("user_id", id).eq("role", "owner").maybeSingle();
+        targetEmail = u.user.email ?? "";
+        return { email: escHtml(targetEmail), email_confirmed: !!u.user.email_confirmed_at, is_owner: !!o };
+      },
+      write: async (grant) => {
+        const { data: r, error } = await admin!.rpc("set_admin_role_audited", { _actor: ctx.userId, _actor_email: actorEmail, _target: data.user_id, _target_email: targetEmail, _grant: grant });
+        if (error) throw new Error(error.message);
+        return !!r;
+      },
+      notify: (text) => sendTelegram(text, "admin-role"),
+    });
   });
 
 // ---------- Owner reversals: Undo Verify / Full Refund ----------
