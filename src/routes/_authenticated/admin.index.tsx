@@ -184,7 +184,7 @@ function OrdersAdmin() {
           </label>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="outline" disabled={!!updating} onClick={() => setRejecting(null)}>Cancel</Button>
-            <Button disabled={!!updating} onClick={() => rejecting && void patch(rejecting.id, { action: "reject", reason: rejectReason.trim() || undefined })}>{updating ? "Rejecting…" : "Confirm Reject"}</Button>
+            <Button disabled={!!updating} onClick={() => rejecting && void patch(rejecting.id, { action: "reject", ...(rejectReason.trim() ? { reason: rejectReason.trim() } : {}) })}>{updating ? "Rejecting…" : "Confirm Reject"}</Button>
           </div>
         </DialogContent>
       </Dialog>
