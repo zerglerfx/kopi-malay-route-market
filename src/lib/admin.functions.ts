@@ -116,6 +116,7 @@ export const updateOrder = createServerFn({ method: "POST" }).middleware([requir
     action: z.enum(ORDER_ACTIONS),
     tracking_number: z.string().trim().max(80).optional(),
     promo_thb: z.number().min(0).max(10000000).multipleOf(0.01).optional(),
+    reason: z.string().trim().max(200).optional(),
   }).parse(d))
   .handler(async ({ data, context }): Promise<UpdateResult> => {
     const ctx = context as unknown as Ctx & { claims?: { email?: string } };
@@ -131,6 +132,32 @@ export const updateOrder = createServerFn({ method: "POST" }).middleware([requir
         if (opError) throw new Error(opError.message);
         const op = ops?.[0];
         if (op && (["submitting", "uncertain", "receipt_saved"].includes(op.state) || (op.kind === "sale" && op.receipt_number))) throw new Error("Finish reconciling the interrupted POS verification before rejecting this order.");
+      }
+      if (data.action === "reject") {
+        const reason = data.reason?.trim() || null;
+        const { runReject, buildRejectAlert } = await import("./order-reject");
+        const res = await runReject({
+          transition: async () => {
+            // Status must actually change: a repeat on an already-rejected order returns false (from != current).
+            const { data: ok, error } = await admin.rpc("transition_order_status", { _id: data.id, _from: from, _to: to, ...actor, ...(reason ? { _reason: reason } : {}) });
+            if (error) throw new Error(error.message);
+            return !!ok;
+          },
+          buildAlert: async () => {
+            const { data: o } = await admin.from("orders").select("order_number,currency,total_amount,shipping_address,order_items(product_name,selected_variant,quantity)").eq("id", data.id).single();
+            const addr = (o?.shipping_address ?? {}) as { full_name?: string; name?: string; country?: string };
+            const idx = await loadRoleIndex(admin);
+            return buildRejectAlert({
+              orderNumber: o?.order_number ?? "", actorEmail: actor._actor_email, actorRole: actorBadge(ctx.userId, idx), at: new Date(),
+              customerName: addr.full_name ?? addr.name ?? "", country: addr.country ?? "",
+              items: (o?.order_items ?? []) as { product_name: string; selected_variant: string; quantity: number }[],
+              currency: o?.currency ?? "myr", total: Number(o?.total_amount ?? 0), reason,
+            });
+          },
+          send: async (text) => (await import("./telegram.server")).sendTelegram(text, "reject"),
+        });
+        if (!res.ok) throw new Error(conflict);
+        return { ok: true };
       }
       const { data: ok, error } = await admin.rpc("transition_order_status", { _id: data.id, _from: from, _to: to, ...actor, ...(tracking ? { _tracking: tracking } : {}) });
       if (error) throw new Error(error.message);
@@ -164,13 +191,13 @@ export const updateOrder = createServerFn({ method: "POST" }).middleware([requir
     return { ok: true };
   });
 
-export type OrderHistoryEntry = { id: string; changed_at: string; changed_by_email: string; from_status: string | null; to_status: string; tracking_number: string | null; old_tracking_number: string | null; pos_receipt_number: string | null; notes: string | null; actor_role: "owner" | "staff" | null };
+export type OrderHistoryEntry = { id: string; changed_at: string; changed_by_email: string; from_status: string | null; to_status: string; tracking_number: string | null; old_tracking_number: string | null; pos_receipt_number: string | null; notes: string | null; reason: string | null; actor_role: "owner" | "staff" | null };
 
 export const getOrderHistory = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<OrderHistoryEntry[]> => {
     const admin = await adminClient(context as unknown as Ctx);
-    const { data: rows, error } = await admin.from("order_status_history").select("id,changed_at,changed_by,changed_by_email,from_status,to_status,tracking_number,old_tracking_number,pos_receipt_number,notes").eq("order_id", data.id).order("changed_at");
+    const { data: rows, error } = await admin.from("order_status_history").select("id,changed_at,changed_by,changed_by_email,from_status,to_status,tracking_number,old_tracking_number,pos_receipt_number,notes,reason").eq("order_id", data.id).order("changed_at");
     if (error) throw new Error(error.message);
     const idx = await loadRoleIndex(admin);
     return (rows ?? []).map(({ changed_by, ...h }) => ({ ...h, actor_role: actorBadge(changed_by, idx) }));

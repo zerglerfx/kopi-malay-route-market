@@ -27,6 +27,8 @@ function OrdersAdmin() {
   const [filters, setFilters] = useState<OrderFilters>({});
   const setF = (k: keyof OrderFilters, v: string) => setFilters((f) => ({ ...f, [k]: v || undefined }));
   const [details, setDetails] = useState<AdminOrder | null>(null);
+  const [rejecting, setRejecting] = useState<AdminOrder | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const exportFn = useServerFn(exportOrdersCsv);
   const [exporting, setExporting] = useState(false);
   const [qr, setQr] = useState<AdminOrder | null>(null);
@@ -66,7 +68,7 @@ function OrdersAdmin() {
   const rows = useMemo(() => filterOrders(data, filters), [data, filters]);
   const statuses = useMemo(() => statusOptions(data), [data]);
 
-  const patch = async (id: string, p: { action: OrderAction; tracking_number?: string; promo_thb?: number }) => {
+  const patch = async (id: string, p: { action: OrderAction; tracking_number?: string; promo_thb?: number; reason?: string }) => {
     if (updating) return;
     setUpdating(id);
     try {
@@ -74,7 +76,7 @@ function OrdersAdmin() {
       if (!r.ok) {
         if ("shortfall" in r) setShortfall(r.shortfall);
         else if ("promoConfirmation" in r) { setPromoValue(""); setPromoChoice({ id, ...r.promoConfirmation }); }
-      } else { setPromoChoice(null); toast.success("Order updated"); }
+      } else { setPromoChoice(null); setRejecting(null); toast.success("Order updated"); }
     } catch (e) { toast.error(e instanceof Error ? e.message : "Update failed"); }
     finally { setUpdating(null); void qc.invalidateQueries({ queryKey: ["admin"] }); }
   };
@@ -154,7 +156,7 @@ function OrdersAdmin() {
                     <span className="inline-block rounded border px-2 py-0.5 text-xs font-semibold capitalize">{o.status === "verifying" ? "Verifying…" : label(o.status)}</span>
                     {o.status === "pending_verification" && <div className="mt-2 flex flex-col gap-1">
                       <Button size="sm" disabled={!!updating} onClick={() => void patch(o.id, { action: "verify" })}>{updating === o.id ? "Working…" : "Verify"}</Button>
-                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => { if (confirm(`Reject ${o.order_number}? This cannot be undone.`)) void patch(o.id, { action: "reject" }); }}>Reject</Button>
+                      <Button size="sm" variant="outline" disabled={!!updating} onClick={() => { setRejectReason(""); setRejecting(o); }}>Reject</Button>
                     </div>}
                     <div className={`mt-2 inline-block rounded border px-2 py-0.5 text-xs ${o.stock_status === "deducted" ? "bg-primary text-primary-foreground" : o.stock_status === "unknown" ? "border-dashed" : "text-muted-foreground"}`}>{STOCK_LABEL[o.stock_status]}</div>
                     {o.stock_status === "unknown" && o.status === "rejected" && <button onClick={() => void markRestored(o)} className="mt-1 block rounded border px-2 py-0.5 text-xs hover:bg-muted">Mark restored</button>}
@@ -170,6 +172,20 @@ function OrdersAdmin() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Confirm THB promo discount</DialogTitle></DialogHeader>
           {promoChoice && <><p className="text-sm">Customer received {money(promoChoice.currency, promoChoice.paidDiscount)} promo discount.</p><label className="space-y-1 text-sm"><span>THB discount (maximum {money("thb", promoChoice.maxThb)})</span><input aria-label="THB promo discount" type="number" min="0" max={promoChoice.maxThb} step="0.01" value={promoValue} onChange={(e) => setPromoValue(e.target.value)} className="w-full rounded border bg-card px-3 py-2" /></label><Button disabled={!!updating || !promoValue || !Number.isFinite(Number(promoValue)) || Number(promoValue) < 0 || Number(promoValue) > promoChoice.maxThb} onClick={() => void patch(promoChoice.id, { action: "verify", promo_thb: Number(promoValue) })}>Confirm discount and verify</Button></>}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!rejecting} onOpenChange={(v) => !v && !updating && setRejecting(null)}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md">
+          <DialogHeader><DialogTitle>Reject {rejecting?.order_number}?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This cannot be undone. Stock is not changed.</p>
+          <label className="space-y-1 text-sm"><span>Reason (optional)</span>
+            <textarea aria-label="Reject reason" maxLength={200} rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="w-full rounded border bg-card px-3 py-2" />
+            <span className="block text-right text-xs text-muted-foreground">{rejectReason.length}/200</span>
+          </label>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" disabled={!!updating} onClick={() => setRejecting(null)}>Cancel</Button>
+            <Button disabled={!!updating} onClick={() => rejecting && void patch(rejecting.id, { action: "reject", reason: rejectReason.trim() || undefined })}>{updating ? "Rejecting…" : "Confirm Reject"}</Button>
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={!!qr} onOpenChange={(v) => !v && setQr(null)}>
@@ -257,6 +273,7 @@ function History({ id }: { id: string }) {
               {h.old_tracking_number ? <div>Tracking: <span className="font-mono">{h.old_tracking_number}</span> → <span className="font-mono">{h.tracking_number}</span></div> : h.to_status === "shipped" && h.tracking_number && <div>Tracking: <span className="font-mono">{h.tracking_number}</span></div>}
               {h.pos_receipt_number && <div>POS receipt: <span className="font-mono">{h.pos_receipt_number}</span></div>}
               {h.notes && <div>{h.notes}</div>}
+              {h.reason && <div>Reason: {h.reason}</div>}
             </li>
           ))}
         </ol>

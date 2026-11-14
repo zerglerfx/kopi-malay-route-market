@@ -228,6 +228,7 @@ export type Database = {
           order_id: string
           order_number: string
           pos_receipt_number: string | null
+          reason: string | null
           to_status: string
           tracking_number: string | null
         }
@@ -242,6 +243,7 @@ export type Database = {
           order_id: string
           order_number: string
           pos_receipt_number?: string | null
+          reason?: string | null
           to_status: string
           tracking_number?: string | null
         }
@@ -256,6 +258,7 @@ export type Database = {
           order_id?: string
           order_number?: string
           pos_receipt_number?: string | null
+          reason?: string | null
           to_status?: string
           tracking_number?: string | null
         }
@@ -846,6 +849,7 @@ export type Database = {
           _id: string
           _notes?: string
           _pos_receipt?: string
+          _reason?: string
           _to: string
           _tracking?: string
         }
