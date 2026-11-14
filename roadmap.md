@@ -1,4 +1,5 @@
 # Major update (Nov 9)
+- [x] Clear the owner's test PIN lockout and verify awaited PIN security alerts through the authenticated five-attempt flow; Telegram delivery confirmed.
 - [x] Prepare managed email sending and Owner PIN code template for the configured domain; delivery awaits DNS verification and the Owner PIN feature remains a separate next step.
 - [x] Loyverse per-cycle sale/refund receipts, exact THB merchandise pricing, durable retry reconciliation, post-shipment return/write-off decision, audited promo confirmation and additive checkout snapshot; Orders receipt history/search/CSV. Authenticated details/export and mocked receipt flows verified; no live sale/refund or inventory adjustment made.
 - [x] Monochrome theme, taller header with logos only, Shop/Services dropdowns, member marquee, New Arrival slider.

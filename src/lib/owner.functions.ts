@@ -61,7 +61,7 @@ export const setOwnerPin = createServerFn({ method: "POST" }).middleware([requir
     const { error } = await admin.from("owner_pins").upsert({ user_id: userId, salt, pin_hash: await hashPin(data.pin, salt), failed_attempts: 0, locked_until: null, updated_at: new Date().toISOString() });
     if (error) throw new Error(error.message);
     const { sendTelegram, escHtml } = await import("./telegram.server");
-    void sendTelegram(`🔑 <b>Owner PIN ${existing ? "reset" : "set"}</b>\n• Owner: ${escHtml(email)}\n• Time: ${new Date().toLocaleString("en-GB", { timeZone: "Asia/Bangkok" })}`, "pin-set");
+    await sendTelegram(`🔑 <b>Owner PIN ${existing ? "reset" : "set"}</b>\n• Owner: ${escHtml(email)}\n• Time: ${new Date().toLocaleString("en-GB", { timeZone: "Asia/Bangkok" })}`, "pin-set");
     return { ok: true as const };
   });
 

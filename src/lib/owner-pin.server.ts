@@ -62,7 +62,7 @@ export async function verifyOwnerPin(admin: Admin, userId: string, pin: string, 
   const { data: lockedUntil } = await admin.rpc("register_owner_pin_failure", { _user: userId });
   if (lockedUntil) {
     const { sendTelegram, escHtml } = await import("./telegram.server");
-    void sendTelegram(`🔒 <b>Owner PIN locked</b>\n• Owner: ${escHtml(ownerEmail)}\n• Reason: 5 wrong PIN attempts\n• Locked until: ${new Date(lockedUntil as string).toLocaleString("en-GB", { timeZone: "Asia/Bangkok" })}`, "pin-lock");
+    await sendTelegram(`🔒 <b>Owner PIN locked</b>\n• Owner: ${escHtml(ownerEmail)}\n• Reason: 5 wrong PIN attempts\n• Locked until: ${new Date(lockedUntil as string).toLocaleString("en-GB", { timeZone: "Asia/Bangkok" })}`, "pin-lock");
     return { ok: false, reason: "locked", lockedUntil: lockedUntil as string };
   }
   return { ok: false, reason: "wrong" };
