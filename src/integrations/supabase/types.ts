@@ -336,6 +336,63 @@ export type Database = {
         }
         Relationships: []
       }
+      owner_pin_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          expires_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      owner_pins: {
+        Row: {
+          failed_attempts: number
+          locked_until: string | null
+          pin_hash: string
+          salt: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          failed_attempts?: number
+          locked_until?: string | null
+          pin_hash: string
+          salt: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          failed_attempts?: number
+          locked_until?: string | null
+          pin_hash?: string
+          salt?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       product_stock: {
         Row: {
           id: string
@@ -677,6 +734,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_owner_pin_code: {
+        Args: { _hash: string; _user: string }
+        Returns: string
+      }
       claim_order_pos: {
         Args: { _busy: string; _claim: string; _id: string; _prev: string }
         Returns: boolean
@@ -702,7 +763,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      issue_owner_pin_code: {
+        Args: { _hash: string; _user: string }
+        Returns: string
+      }
       redeem_promo_code: { Args: { _code: string }; Returns: boolean }
+      register_owner_pin_failure: { Args: { _user: string }; Returns: string }
       transition_order_status: {
         Args: {
           _actor: string
@@ -720,7 +786,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "owner"
       promo_discount_type: "percentage" | "fixed_amount"
     }
     CompositeTypes: {
@@ -849,7 +915,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "owner"],
       promo_discount_type: ["percentage", "fixed_amount"],
     },
   },
