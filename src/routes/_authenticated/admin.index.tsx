@@ -10,12 +10,14 @@ import { QRCodeSVG } from "qrcode.react";
 import { exportOrdersCsv, getOrderHistory, listOrders, markOrderStock, reverseOrder, setTrackingLabel, updateOrder, type AdminOrder } from "@/lib/admin.functions";
 import { STOCK_LABEL } from "@/lib/order-stock";
 import { filterOrders, fullAddress, itemsText, money, orderTotals, statusOptions, type AdminOrderRow, type OrderFilters } from "@/lib/admin-csv";
+import { PLACED_LABEL, type PlacedBy } from "@/lib/roles";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/admin/")({ component: OrdersAdmin, head: () => ({ meta: [{ title: "Orders | Kopi Malay Admin" }, { name: "description", content: "Manage Kopi Malay website orders and POS receipt history." }, { property: "og:title", content: "Orders | Kopi Malay Admin" }, { property: "og:description", content: "Manage Kopi Malay website orders and POS receipt history." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }) });
 
 const label = (s: string) => s.replace(/_/g, " ");
+const RoleTag = ({ kind }: { kind: PlacedBy | null }) => kind ? <span className="ml-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">{PLACED_LABEL[kind]}</span> : null;
 
 function OrdersAdmin() {
   const fetchOrders = useServerFn(listOrders);
@@ -103,6 +105,9 @@ function OrdersAdmin() {
         <select aria-label="Country filter" value={filters.currency ?? ""} onChange={(e) => setF("currency", e.target.value)} className="rounded-md border bg-card px-2 py-2 text-sm">
           <option value="">All countries</option><option value="myr">Malaysia (MYR)</option><option value="thb">Thailand (THB)</option>
         </select>
+        <select aria-label="Placed by filter" value={filters.placed_by ?? ""} onChange={(e) => setF("placed_by", e.target.value)} className="rounded-md border bg-card px-2 py-2 text-sm">
+          <option value="">Placed by: all</option><option value="guest">Guest</option><option value="customer">Customer</option><option value="staff">Staff</option><option value="owner">Owner</option>
+        </select>
         <label className="flex items-center gap-1 text-xs">From<input type="date" value={filters.from ?? ""} onChange={(e) => setF("from", e.target.value)} className="rounded-md border bg-card px-2 py-1.5 text-sm" /></label>
         <label className="flex items-center gap-1 text-xs">To<input type="date" value={filters.to ?? ""} onChange={(e) => setF("to", e.target.value)} className="rounded-md border bg-card px-2 py-1.5 text-sm" /></label>
         {Object.values(filters).some(Boolean) && <button onClick={() => setFilters({})} className="text-xs underline">Clear</button>}
@@ -119,7 +124,7 @@ function OrdersAdmin() {
             <tbody>
               {rows.map((o, i) => (
                 <tr key={o.id} className="border-t align-top">
-                  <td className="px-3 py-2 font-semibold">{i + 1}<button onClick={() => setDetails(o)} className="block font-mono text-xs font-normal underline">{o.order_number}</button></td>
+                  <td className="px-3 py-2 font-semibold">{i + 1}<button onClick={() => setDetails(o)} className="block font-mono text-xs font-normal underline">{o.order_number}</button><RoleTag kind={o.placed_by} /></td>
                   <td className="px-3 py-2">{o.address.name}<div className="text-xs text-muted-foreground">{o.email}</div></td>
                   <td className="max-w-[220px] px-3 py-2">{fullAddress(o.address)}</td>
                   <td className="whitespace-nowrap px-3 py-2">{o.address.phone}</td>
@@ -187,6 +192,7 @@ function OrdersAdmin() {
             <div className="flex flex-wrap gap-2 text-xs">
               <span className="rounded border px-2 py-0.5 capitalize">{label(details.status)}</span>
               <span className="rounded border px-2 py-0.5">{STOCK_LABEL[details.stock_status]}</span>
+              <RoleTag kind={details.placed_by} />
               <span className="text-muted-foreground">{new Date(details.created_at).toLocaleString()}</span>
             </div>
             <div><div className="font-semibold">{details.address.name}</div><div>{details.email}</div><div>{details.address.phone}</div><div className="text-muted-foreground">{fullAddress(details.address)}</div></div>
@@ -247,7 +253,7 @@ function History({ id }: { id: string }) {
           {data.map((h) => (
             <li key={h.id} className="text-xs">
               <div className="font-medium capitalize">{h.from_status === h.to_status ? "Tracking corrected" : `${label(h.from_status ?? "—")} → ${label(h.to_status)}`}</div>
-              <div className="text-muted-foreground">{new Date(h.changed_at).toLocaleString()} · {h.changed_by_email || "admin"}</div>
+              <div className="text-muted-foreground">{new Date(h.changed_at).toLocaleString()} · {h.changed_by_email || "admin"}{h.actor_role && <RoleTag kind={h.actor_role} />}</div>
               {h.old_tracking_number ? <div>Tracking: <span className="font-mono">{h.old_tracking_number}</span> → <span className="font-mono">{h.tracking_number}</span></div> : h.to_status === "shipped" && h.tracking_number && <div>Tracking: <span className="font-mono">{h.tracking_number}</span></div>}
               {h.pos_receipt_number && <div>POS receipt: <span className="font-mono">{h.pos_receipt_number}</span></div>}
               {h.notes && <div>{h.notes}</div>}

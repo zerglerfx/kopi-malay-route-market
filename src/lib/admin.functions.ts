@@ -5,6 +5,7 @@ import { filterOrders, ordersToCsv, type AdminOrderRow } from "./admin-csv";
 import { TOWING_STATUSES } from "./towing";
 import { type StockStatus } from "./order-stock";
 import { ORDER_ACTIONS, ORDER_FLOW } from "./order-flow";
+import { buildRoleChanges, buildRoleIndex, actorBadge, highestRole, orderPlacer, sortUsersByRole, type PlacedBy, type RoleIndex } from "./roles";
 type StockDelta = { variantId: string; quantity: number };
 type UpdateResult = { ok: true } | { ok: false; shortfall: { item: string; needed: number; available: number }[] } | { ok: false; promoConfirmation: { paidDiscount: number; currency: string; maxThb: number } } | { ok: false; returnStockRequired: true };
 
@@ -26,11 +27,12 @@ export const checkAdmin = createServerFn({ method: "GET" }).middleware([requireS
 });
 
 // ---------- Orders ----------
-export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; sticker_bundle_discount: number; promo_code: string | null; stock_status: StockStatus };
+export type AdminOrder = AdminOrderRow & { id: string; receipt_url: string | null; label_url: string | null; subtotal: number; shipping_fee: number; discount_amount: number; sticker_bundle_discount: number; promo_code: string | null; stock_status: StockStatus; placed_by: PlacedBy | null };
 
 const FilterSchema = z.object({
   q: z.string().max(200).optional(), status: z.string().max(50).optional(), currency: z.enum(["myr", "thb"]).optional(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  placed_by: z.enum(["guest", "customer", "staff", "owner"]).optional(),
 }).optional();
 
 export const listOrders = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }): Promise<AdminOrder[]> => {
@@ -46,9 +48,19 @@ export const exportOrdersCsv = createServerFn({ method: "POST" }).middleware([re
     return ordersToCsv(filterOrders(await loadOrders(admin), data ?? {}));
   });
 
+/** Roles + which accounts still exist, for display badges only. */
+async function loadRoleIndex(admin: Awaited<ReturnType<typeof adminClient>>): Promise<RoleIndex> {
+  const [{ data: roles }, { data: users }] = await Promise.all([
+    admin.from("user_roles").select("user_id,role"),
+    admin.auth.admin.listUsers({ perPage: 1000 }),
+  ]);
+  return buildRoleIndex(roles ?? [], (users?.users ?? []).map((u) => u.id));
+}
+
 async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promise<AdminOrder[]> {
+  const idx = await loadRoleIndex(admin);
   const { data, error } = await admin.from("orders")
-    .select("id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,sticker_bundle_discount,sale_discount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
+    .select("id,user_id,order_number,created_at,status,currency,total_amount,subtotal,shipping_fee,discount_amount,sticker_bundle_discount,sale_discount,promo_code,payment_method,tracking_number,tracking_label_path,guest_email,shipping_address,receipt_path,stock_status,order_items(product_name,selected_variant,quantity)")
     .order("created_at", { ascending: false }).limit(1000);
   if (error) throw new Error(error.message);
   const { data: posRows, error: posError } = await admin.from("order_pos_operations").select("order_id,cycle,kind,receipt_number,total_thb,promo_thb,confirmed_by,created_at").in("order_id", (data ?? []).map((o) => o.id)).order("cycle").order("created_at");
@@ -63,6 +75,7 @@ async function loadOrders(admin: Awaited<ReturnType<typeof adminClient>>): Promi
     items: o.order_items ?? [],
     pos_history: (posRows ?? []).filter((p) => p.order_id === o.id).map((p) => ({ cycle: p.cycle, kind: p.kind, receipt_number: p.receipt_number, total_thb: p.total_thb == null ? null : Number(p.total_thb), promo_thb: p.promo_thb == null ? null : Number(p.promo_thb), confirmed_by: p.confirmed_by, created_at: p.created_at })),
     stock_status: o.stock_status as StockStatus,
+    placed_by: orderPlacer(o.user_id, idx),
     receipt_url: signed.find((s) => s.path === o.receipt_path)?.signedUrl ?? null,
     label_url: o.tracking_label_path ? signed.find((s) => s.path === o.tracking_label_path)?.signedUrl ?? null : null,
   }));
@@ -151,15 +164,16 @@ export const updateOrder = createServerFn({ method: "POST" }).middleware([requir
     return { ok: true };
   });
 
-export type OrderHistoryEntry = { id: string; changed_at: string; changed_by_email: string; from_status: string | null; to_status: string; tracking_number: string | null; old_tracking_number: string | null; pos_receipt_number: string | null; notes: string | null };
+export type OrderHistoryEntry = { id: string; changed_at: string; changed_by_email: string; from_status: string | null; to_status: string; tracking_number: string | null; old_tracking_number: string | null; pos_receipt_number: string | null; notes: string | null; actor_role: "owner" | "staff" | null };
 
 export const getOrderHistory = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<OrderHistoryEntry[]> => {
     const admin = await adminClient(context as unknown as Ctx);
-    const { data: rows, error } = await admin.from("order_status_history").select("id,changed_at,changed_by_email,from_status,to_status,tracking_number,old_tracking_number,pos_receipt_number,notes").eq("order_id", data.id).order("changed_at");
+    const { data: rows, error } = await admin.from("order_status_history").select("id,changed_at,changed_by,changed_by_email,from_status,to_status,tracking_number,old_tracking_number,pos_receipt_number,notes").eq("order_id", data.id).order("changed_at");
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const idx = await loadRoleIndex(admin);
+    return (rows ?? []).map(({ changed_by, ...h }) => ({ ...h, actor_role: actorBadge(changed_by, idx) }));
   });
 
 async function describeShortfall(admin: Awaited<ReturnType<typeof adminClient>>, short: { variantId: string; needed: number; available: number }[]) {
@@ -329,10 +343,9 @@ export const updateTowing = createServerFn({ method: "POST" }).middleware([requi
 // ---------- Users ----------
 /** Owner-only: verify admin + owner role as the caller before using the service client. */
 async function ownerClient(context: Ctx) {
-  const admin = await adminClient(context);
-  const { assertOwner } = await import("./owner-pin.server");
-  await assertOwner(context as never);
-  return admin;
+  const { assertOwnerCaller } = await import("./owner-gate.server");
+  await assertOwnerCaller(context as never);
+  return adminClient(context);
 }
 
 export const listUsers = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth]).handler(async ({ context }) => {
@@ -347,16 +360,27 @@ export const listUsers = createServerFn({ method: "POST" }).middleware([requireS
   const prof = new Map((profiles.data ?? []).map((p) => [p.id, p]));
   const admins = new Set((roles.data ?? []).filter((r) => r.role === "admin").map((r) => r.user_id));
   const owners = new Set((roles.data ?? []).filter((r) => r.role === "owner").map((r) => r.user_id));
-  return data.users.map((u) => ({
+  return sortUsersByRole(data.users.map((u) => ({
     id: u.id, email: u.email ?? "", created_at: u.created_at, last_sign_in_at: u.last_sign_in_at ?? null,
     provider: (u.app_metadata?.["provider"] as string | undefined) ?? "email",
     is_admin: admins.has(u.id),
     is_owner: owners.has(u.id),
+    role: highestRole([...(owners.has(u.id) ? ["owner"] : []), ...(admins.has(u.id) ? ["admin"] : [])]),
     email_confirmed: !!u.email_confirmed_at,
     profile: prof.get(u.id) ?? null,
     orders: (orders.data ?? []).filter((o) => o.user_id === u.id || (!!u.email && o.guest_email?.toLowerCase() === u.email.toLowerCase())).length,
-  }));
+  })));
 });
+
+/** Owner-only, read-only view of the admin role audit log. */
+export const listRoleChanges = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ q: z.string().max(200).optional(), action: z.enum(["all", "grant", "remove"]).optional(), offset: z.number().int().min(0).max(100000).optional() }).parse(d ?? {}))
+  .handler(async ({ data, context }) => {
+    const admin = await ownerClient(context as unknown as Ctx);
+    const { data: rows, error } = await admin.from("admin_role_audit").select("id,changed_at,action,changed_by,changed_by_email,target_user_id,target_email").order("changed_at", { ascending: false }).limit(5000);
+    if (error) throw new Error(error.message);
+    return buildRoleChanges(rows ?? [], await loadRoleIndex(admin), data);
+  });
 
 export const setAdminRole = createServerFn({ method: "POST" }).middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ user_id: z.string().uuid(), admin: z.boolean() }).parse(d))

@@ -24,3 +24,4 @@
 - [x] Apply destination shipping throughout checkout and receipts; Thai tumbler and 20-unit accessory rules supersede the original rates.
 - [x] Verify catalog photos, sizes, prices and shipping calculations (Stripe handoff verified; no payment submitted).
 - [x] Anniversary jersey prices and Thai apparel prices supplied; replace legacy apparel with the five official listings.
+- [x] Owner/Staff/Customer labels, Placed-by filter (also CSV), role change log

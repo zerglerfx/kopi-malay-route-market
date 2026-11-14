@@ -42,16 +42,17 @@ export function orderTotals(o: AdminOrderRow) {
 
 export const money = (currency: string, n: number) => (currency.toLowerCase() === "myr" ? `RM ${n.toFixed(2)}` : `THB ${n.toFixed(2)}`);
 
-export type OrderFilters = { q?: string | undefined; status?: string | undefined; currency?: string | undefined; from?: string | undefined; to?: string | undefined };
+export type OrderFilters = { q?: string | undefined; status?: string | undefined; currency?: string | undefined; from?: string | undefined; to?: string | undefined; placed_by?: string | undefined };
 
 export const digits = (s: string) => s.replace(/\D/g, "");
 
 /** Search (ref, name, email, phone digits, product) + status, currency and date range (YYYY-MM-DD, inclusive). */
-export function filterOrders<T extends AdminOrderRow>(rows: T[], f: OrderFilters): T[] {
+export function filterOrders<T extends AdminOrderRow & { placed_by?: string | null }>(rows: T[], f: OrderFilters): T[] {
   const q = (f.q ?? "").trim().toLowerCase();
   const qd = digits(q);
   return rows.filter((o) => {
     if (f.status && o.status !== f.status) return false;
+    if (f.placed_by && o.placed_by !== f.placed_by) return false;
     if (f.currency && o.currency.toLowerCase() !== f.currency.toLowerCase()) return false;
     const day = o.created_at.slice(0, 10);
     if (f.from && day < f.from) return false;
