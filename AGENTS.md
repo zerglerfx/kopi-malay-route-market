@@ -35,6 +35,6 @@
 - Admin order status changes go only through `updateOrder` using the shared `src/lib/order-flow.ts` map; the service-only `transition_order_status` SQL function writes the status and its append-only `order_status_history` row in one transaction (Verify first claims via `claim_order_verify`), so the browser can never change status and history can't be edited.
 - App emails use the server-only managed send helper and registered React Email templates; feature handlers fix the recipient and template, while `/lovable/*` bypasses app guards and authenticates itself, avoiding public arbitrary-send endpoints or local delivery queues.
 - Owner PIN: owner role (granted at verified Google sign-in) gates PIN/refund/undo; PIN = PBKDF2 + salt + `OWNER_PIN_PEPPER` secret, email codes issued/checked and failures counted only by service-only SQL functions, so limits are atomic and the browser has no access.
-- Await PIN Telegram alerts before responding to prevent cancelled delivery.
+- Await PIN Telegram alerts (unawaited ones get cancelled).
 - Owner reversals go through `runReversal` (order-reverse.server.ts): role → PIN → claim → POS → one-transaction finish → best-effort alert; failures release the claim.
-- Admin role changes go through `runSetAdminRole` (admin-role.server.ts) and the service-only `set_admin_role_audited` SQL function, which writes the role and its append-only `admin_role_audit` row in one transaction; alerts are best-effort.
+- Admin role changes: `runSetAdminRole` → service-only `set_admin_role_audited` (role + append-only audit row, one transaction).
