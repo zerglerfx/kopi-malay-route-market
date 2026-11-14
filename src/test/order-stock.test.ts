@@ -9,6 +9,8 @@ describe("order stock deduction timing", () => {
   it("moving a deducted order back to pending restores", () => expect(planStockAction("deducted", "pending_verification")).toBe("restore"));
   it("rejecting a restored order again does nothing", () => expect(planStockAction("restored", "rejected")).toBe("none"));
   it("re-verifying after restore deducts once more", () => expect(planStockAction("restored", "verified")).toBe("deduct"));
+  it("re-verifying after an undo with write-off creates a fresh deduction", () => expect(planStockAction("written_off", "verified")).toBe("deduct"));
+  it("a written-off refund does not restore inventory automatically", () => expect(planStockAction("written_off", "refunded")).toBe("none"));
   it("legacy orders are never moved automatically", () => {
     expect(planStockAction("unknown", "verified")).toBe("none");
     expect(planStockAction("unknown", "rejected")).toBe("none");

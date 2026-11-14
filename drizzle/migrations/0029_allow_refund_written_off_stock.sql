@@ -1,0 +1,3 @@
+ALTER TABLE public.orders DROP CONSTRAINT orders_stock_status_check;
+ALTER TABLE public.orders ADD CONSTRAINT orders_stock_status_check CHECK (stock_status IN ('not_deducted','deducting','deducted','restoring','restored','written_off','unknown'));
+COMMENT ON CONSTRAINT orders_stock_status_check ON public.orders IS 'Includes inventory write-offs after owner-authorized refunds and Undo Verify; restored records represent returned or manually recovered inventory.';

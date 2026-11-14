@@ -204,6 +204,13 @@
       "when": 1794640713193,
       "tag": "0028_order_reversal",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794644395080,
+      "tag": "0029_allow_refund_written_off_stock",
+      "breakpoints": true
     }
   ]
 }
