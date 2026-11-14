@@ -17,6 +17,9 @@ Display and labels only. No database roles, permissions, access rules, totals, s
 ## 3. Order timeline
 - Each history entry shows an Owner or Staff badge next to the actor's email, looked up on the server from the actor's account id.
 
+## Missing or role-less accounts
+- In the timeline and Orders badges, a deleted account or a staff member whose role was removed shows no badge, and never causes an error. (A signed-in order from an account that still exists but has no role still shows Customer.)
+
 ## Answer to include in the summary
 Today staff/owner-placed orders are counted in the sales totals — the counter only skips Refunded, Rejected and in-progress reversals. This stays unchanged.
 
@@ -25,4 +28,4 @@ Today staff/owner-placed orders are counted in the sales totals — the counter 
 - `listUsers` returns `role` and `created_at`, sorted server-side; `is_admin`/`is_owner` kept for the checkbox.
 - `loadOrders` selects `user_id`, attaches `placed_by` via one `user_roles` query; `FilterSchema` gains optional `placed_by` used only by the list filter (CSV columns untouched).
 - History query adds `changed_by`, attaches `actor_role`.
-- Tests (`src/test/roles.test.ts`, plus admin-role test): badge per kind incl. multi-role; chip counts equal filtered list lengths; non-owner calling the users list is rejected; order badge for guest, customer and staff-placed orders.
+- Tests (`src/test/roles.test.ts`, plus admin-role test): badge per kind incl. multi-role; chip counts equal filtered list lengths; non-owner calling the users list is rejected; order badge for guest, customer and staff-placed orders; deleted or role-less accounts give no badge and no error.
