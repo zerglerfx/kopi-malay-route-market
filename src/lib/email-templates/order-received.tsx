@@ -35,7 +35,7 @@ const s = {
 
 export const template = {
   component: OrderReceived,
-  subject: (d: Record<string, any>) => `Order ${d.orderNumber ?? ""} received — Kopi Malay`,
+  subject: (d: Record<string, any>) => `Order ${d["orderNumber"] ?? ""} received — Kopi Malay`,
   displayName: "Order received (guest tracking link)",
   previewData: { name: "Ahmad", orderNumber: "KM-12345", total: "RM 45.00", link: "https://kopimalay.com/order-success?ref=KM-12345&t=example" },
 } satisfies TemplateEntry;

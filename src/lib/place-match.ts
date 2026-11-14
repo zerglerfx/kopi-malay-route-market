@@ -6,7 +6,7 @@ function distance(a: string, b: string): number {
   for (let i = 1; i <= a.length; i++) {
     let prev = d[0]!; d[0] = i;
     for (let j = 1; j <= b.length; j++) {
-      const cur = d[j];
+      const cur = d[j]!;
       d[j] = Math.min(d[j]! + 1, d[j - 1]! + 1, prev! + (a[i - 1] === b[j - 1] ? 0 : 1));
       prev = cur;
     }
